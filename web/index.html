@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Andén</title>
 <meta name="description" content="Todos los trenes de Renfe que circulan ahora mismo, en el mapa con su retraso real.">
+<meta property="og:title" content="Andén · los trenes de Renfe en directo, con IA">
+<meta property="og:description" content="Todos los trenes en el mapa con su retraso real, una red neuronal que estima cómo irán y un detector de posibles incidencias. Prototipo de TFM.">
+<meta property="og:image" content="https://puntualmente-web.vercel.app/base/portada.jpg">
+<meta property="og:url" content="https://puntualmente-web.vercel.app">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a111d'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%236fd3bd'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -93,6 +98,28 @@
       <p class="version" id="famVersion"></p>
     </div>
     <div class="grafica" id="famGrafica" role="img" aria-label="Gráfica de dispersión de las líneas de Cercanías por retraso medio y porcentaje de trenes con más de 15 minutos"></div>
+  </section>
+
+  <section class="arquitectura">
+    <h2>Cómo funciona por dentro</h2>
+    <p>Dos caminos salen de los mismos datos abiertos. Uno enseña el presente; el otro lo guarda para que la IA aprenda.</p>
+    <div class="diagrama">
+      <svg viewBox="0 0 920 300" role="img" aria-label="Diagrama: los datos de Renfe van a la web en directo cada 15 segundos y a la caja negra cada 5 minutos; cada noche se reentrenan los modelos con lo grabado y se publican en la web">
+        <defs><marker id="flecha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="punta"/></marker></defs>
+        <g class="nodo fuente"><rect x="10" y="110" width="170" height="80" rx="6"/><text x="95" y="140">Datos abiertos</text><text x="95" y="160" class="sub">de Renfe: posiciones,</text><text x="95" y="176" class="sub">retrasos y avisos</text></g>
+        <g class="nodo"><rect x="270" y="20" width="190" height="80" rx="6"/><text x="365" y="50">Vercel</text><text x="365" y="70" class="sub">junta las fuentes</text><text x="365" y="86" class="sub">cada 15 segundos</text></g>
+        <g class="nodo"><rect x="270" y="200" width="190" height="80" rx="6"/><text x="365" y="230">Caja negra</text><text x="365" y="250" class="sub">GitHub guarda una foto</text><text x="365" y="266" class="sub">de la red cada 5 min</text></g>
+        <g class="nodo ia"><rect x="530" y="200" width="170" height="80" rx="6"/><text x="615" y="230">Entreno nocturno</text><text x="615" y="250" class="sub">red neuronal y</text><text x="615" y="266" class="sub">familias de líneas</text></g>
+        <g class="nodo destino"><rect x="740" y="90" width="170" height="120" rx="6"/><text x="825" y="122">Andén</text><text x="825" y="142" class="sub">mapa en directo,</text><text x="825" y="158" class="sub">previsión de la IA,</text><text x="825" y="174" class="sub">incidencias y moviola</text></g>
+        <path d="M180,135 C225,135 225,60 268,60" class="flujo" marker-end="url(#flecha)"/>
+        <path d="M180,165 C225,165 225,240 268,240" class="flujo" marker-end="url(#flecha)"/>
+        <path d="M460,60 C600,60 640,120 738,120" class="flujo" marker-end="url(#flecha)"/>
+        <path d="M460,240 L528,240" class="flujo" marker-end="url(#flecha)"/>
+        <path d="M700,240 C720,240 720,190 738,190" class="flujo" marker-end="url(#flecha)"/>
+        <path d="M460,222 C560,160 640,160 738,160" class="flujo fino" marker-end="url(#flecha)"/>
+        <text x="600" y="152" class="etq">la moviola lee lo grabado</text>
+      </svg>
+    </div>
   </section>
 
   <section class="ia">
@@ -314,7 +341,7 @@ function dibujar(ahora) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke(); ctx.setLineDash([]);
     ctx.globalAlpha = (1 - k) * .6; ctx.beginPath(); ctx.arc(x, y, r + k * 26, 0, 7); ctx.stroke();
     ctx.globalAlpha = 1; ctx.fillStyle = C.rojo; ctx.font = '600 12px "Barlow Condensed", sans-serif'; ctx.textAlign = 'center';
-    let ly = y - r - 8; while (etiquetas.some(([ex, ey]) => Math.abs(ex - x) < 200 && Math.abs(ey - ly) < 16)) ly -= 16; etiquetas.push([x, ly]);
+    let ly = y - r - 8; if (ly < 56) ly = y + r + 18; while (etiquetas.some(([ex, ey]) => Math.abs(ex - x) < 200 && Math.abs(ey - ly) < 16)) ly -= 16; etiquetas.push([x, ly]);
     ctx.fillText(`POSIBLE INCIDENCIA · ${f.k.toUpperCase()}`, x, ly); ctx.textAlign = 'left';
   }
   if (foco) {

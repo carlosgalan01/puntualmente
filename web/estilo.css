@@ -173,3 +173,18 @@ body { margin: 0; }
 .salud { display: grid; gap: 4px; border-top: 1px solid var(--raya); padding-top: 10px; }
 .salud-cab { display: flex; justify-content: space-between; gap: 8px; font: 11.5px var(--dato); color: var(--tenue); flex-wrap: wrap; }
 .salud svg { display: block; height: 56px; }
+
+/* arquitectura */
+.arquitectura { display: grid; gap: 8px; }
+.arquitectura h2 { font: 800 30px/1 var(--display); margin: 0; }
+.arquitectura > p { margin: 0 0 6px; color: var(--tenue); max-width: 64ch; }
+.diagrama { overflow-x: auto; background: var(--panel); border: 1px solid var(--raya); border-radius: 6px; padding: 14px; }
+.diagrama svg { display: block; width: 100%; min-width: 640px; height: auto; }
+.nodo rect { fill: var(--noche); stroke: var(--via); stroke-width: 1.5; }
+.nodo.ia rect { stroke: var(--ambar); } .nodo.destino rect { stroke: var(--puntual); }
+.nodo text { font: 600 17px var(--rotulo); fill: var(--texto); text-anchor: middle; }
+.nodo text.sub { font: 400 12.5px var(--cuerpo); fill: var(--tenue); }
+.flujo { fill: none; stroke: var(--linea); stroke-width: 2; }
+.flujo.fino { stroke-dasharray: 5 5; }
+.punta { fill: var(--linea); }
+.diagrama .etq { font: 11.5px var(--dato); fill: var(--tenue); text-anchor: middle; }
