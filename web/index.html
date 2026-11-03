@@ -31,10 +31,11 @@
         <span><i style="background:var(--puntual)"></i>En hora</span><span><i style="background:var(--leve)"></i>3–5 min</span><span><i style="background:var(--ambar)"></i>6–15 min</span><span><i style="background:var(--rojo)"></i>Más de 15</span><span>◯ larga y media distancia</span>
       </div>
       <div class="mando">
-        <div class="modos" role="group" aria-label="Qué ver"><button id="mVivo" aria-pressed="true">En directo</button><button id="mMoviola" aria-pressed="false">Moviola de hoy</button></div>
+        <div class="modos" role="group" aria-label="Qué ver"><button id="mVivo" aria-pressed="true">En directo</button><button id="mPrev" aria-pressed="false">Previsión IA</button><button id="mMoviola" aria-pressed="false">Moviola de hoy</button></div>
         <span class="estado-vivo" id="vivo">Pidiendo los datos a Renfe…</span>
         <div class="moviola" id="moviola" hidden><button class="play" id="play" aria-label="Pausar">❚❚</button><span class="reloj" id="reloj">--:--</span><input type="range" id="linea" min="0" max="1000" value="0" aria-label="Momento del día"><span class="vel" id="vel"></span></div>
       </div>
+      <div class="leyenda-prev" id="leyendaPrev" hidden>Colores según el retraso que <b>la red neuronal estima</b> para dentro de unos minutos. Anillo ámbar: la IA cree que ese tren va a empeorar.</div>
       <div class="ficha" id="ficha" hidden></div>
     </div>
 
@@ -144,11 +145,11 @@ function aplicar(j) {
     vistos.add(t.id);
     const nuevo = [X(t.lon), Y(t.lat)];
     let e = trenes.get(t.id);
-    if (!e) { trenes.set(t.id, { ...t, de: nuevo, a: nuevo, t0: ahora, al0: ultimaFoto ? 0 : 1, al1: 1, rastro: [], hist: [[j.t, t.d, t.lat, t.lon]] }); continue; }
+    if (!e) { trenes.set(t.id, { ...t, de: nuevo, a: nuevo, t0: ahora, al0: ultimaFoto ? 0 : 1, al1: 1, rastro: [], hist: [[j.t, t.d, t.lat, t.lon]] }); trenes.get(t.id).pred = predecir(trenes.get(t.id)); continue; }
     const p = pos(e, ahora), salto = Math.hypot(nuevo[0] - p[0], nuevo[1] - p[1]) > .4;
     if (!salto) { e.rastro.push(p); if (e.rastro.length > 8) e.rastro.shift(); } else e.rastro = [];
     Object.assign(e, t, { de: salto ? nuevo : p, a: nuevo, t0: ahora, al0: alfa(e, ahora), al1: 1, fuera: false });
-    e.hist.push([j.t, t.d, t.lat, t.lon]); if (e.hist.length > 60) e.hist.shift();
+    e.hist.push([j.t, t.d, t.lat, t.lon]); if (e.hist.length > 60) e.hist.shift(); e.pred = predecir(e);
   }
   for (const [id, e] of trenes) {
     if (vistos.has(id) || !llego[e.k]) continue;
@@ -179,7 +180,7 @@ function estadoH(h, t) {
   if (b) return u > .5 ? [b[0], b[1], b[2], (u - .5) * 2] : null;
   return null;
 }
-const enDirecto = () => modo === 'vivo' || !(hist?.t.length > 1);
+const enDirecto = () => modo !== 'moviola' || !(hist?.t.length > 1);
 function actuales(ahora) {
   if (enDirecto()) return [...trenes.values()].map(e => ({ e, p: pos(e, ahora), a: alfa(e, ahora), r: e.rastro }));
   const out = [];
@@ -210,10 +211,12 @@ function cambiarModo(m) {
   modo = m;
   document.getElementById('mVivo').setAttribute('aria-pressed', m === 'vivo');
   document.getElementById('mMoviola').setAttribute('aria-pressed', m === 'moviola');
-  document.getElementById('vivo').hidden = m !== 'vivo';
-  document.getElementById('moviola').hidden = m === 'vivo';
+  document.getElementById('mPrev').setAttribute('aria-pressed', m === 'prevision');
+  document.getElementById('vivo').hidden = m === 'moviola';
+  document.getElementById('moviola').hidden = m !== 'moviola';
+  document.getElementById('leyendaPrev').hidden = m !== 'prevision';
   foco = null; siguiendo = false; seguido();
-  document.getElementById('selloModo').innerHTML = m === 'vivo' ? '<span class="rec"></span>En directo' : 'Moviola de hoy';
+  document.getElementById('selloModo').innerHTML = m === 'moviola' ? 'Moviola de hoy' : m === 'prevision' ? '<span class="rec"></span>Previsión de la IA' : '<span class="rec"></span>En directo';
   if (m === 'moviola') { document.getElementById('tramo').textContent = 'Lo grabado hoy'; abrirMoviola(); } else { pintarEstado(); }
   panel();
 }
@@ -282,7 +285,7 @@ function dibujar(ahora) {
     if (a <= 0.01) continue;
     const x = sx(wx), y = sy(wy); puntos.push([e, x, y, a]);
     if (fuera(x, y)) continue;
-    const col = color(e.d);
+    const col = colorDe(e);
     ctx.globalAlpha = a * .22; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r0 * 2.6, 0, 7); ctx.fill();
     if (rastro.length && z > 1.5) {
       ctx.globalAlpha = a * .35; ctx.strokeStyle = col; ctx.lineWidth = r0 * .7; ctx.beginPath();
@@ -292,12 +295,14 @@ function dibujar(ahora) {
   ctx.globalCompositeOperation = 'source-over';
   for (const [e, x, y, a] of puntos) {
     if (fuera(x, y)) continue;
-    ctx.globalAlpha = a; ctx.fillStyle = color(e.d);
+    ctx.globalAlpha = a; ctx.fillStyle = colorDe(e);
+    if (modo === 'prevision' && e.pred != null && e.pred - e.d >= 2 && !fuera(x, y)) { ctx.strokeStyle = C.ambar; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(x, y, r0 * 2.1, 0, 7); ctx.stroke(); }
     const r = e.k === 'l' ? r0 * 1.15 : r0 * .85;
     ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
     if (e.k === 'l') { ctx.strokeStyle = C.texto; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.arc(x, y, r + 2.2, 0, 7); ctx.stroke(); }
   }
   ctx.globalAlpha = 1;
+  const etiquetas = [];
   for (const f of anomalas) {
     const ps = f.l.map(e => posicionDe(e.id)).filter(Boolean); if (!ps.length) continue;
     const mx = ps.reduce((a, p) => a + p[0], 0) / ps.length, my = ps.reduce((a, p) => a + p[1], 0) / ps.length;
@@ -308,7 +313,8 @@ function dibujar(ahora) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke(); ctx.setLineDash([]);
     ctx.globalAlpha = (1 - k) * .6; ctx.beginPath(); ctx.arc(x, y, r + k * 26, 0, 7); ctx.stroke();
     ctx.globalAlpha = 1; ctx.fillStyle = C.rojo; ctx.font = '600 12px "Barlow Condensed", sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(`POSIBLE INCIDENCIA · ${f.k.toUpperCase()}`, x, y - r - 8); ctx.textAlign = 'left';
+    let ly = y - r - 8; while (etiquetas.some(([ex, ey]) => Math.abs(ex - x) < 200 && Math.abs(ey - ly) < 16)) ly -= 16; etiquetas.push([x, ly]);
+    ctx.fillText(`POSIBLE INCIDENCIA · ${f.k.toUpperCase()}`, x, ly); ctx.textAlign = 'left';
   }
   if (foco) {
     const f = puntos.find(p => p[0].id === foco);
@@ -369,6 +375,7 @@ fetch('/base/familias.json').then(r => r.json()).then(F => {
   document.getElementById('famGrafica').innerHTML = svg + '</svg>';
 }).catch(() => { document.querySelector('.familias')?.remove(); });
 
+const colorDe = e => color(modo === 'prevision' && e.pred != null ? e.pred : e.d);
 const rutaTren = e => e.k === 'l' ? `${e.o} → ${e.dst}` : (e.s ? `próxima: ${e.s}` : `tren ${e.num}`);
 const escapa = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function pintarEstado() {
@@ -505,6 +512,7 @@ rango.addEventListener('input', () => { if (!hist?.t.length) return; arrastrando
 rango.addEventListener('change', () => { arrastrando = false; });
 document.getElementById('mVivo').onclick = () => cambiarModo('vivo');
 document.getElementById('mMoviola').onclick = () => cambiarModo('moviola');
+document.getElementById('mPrev').onclick = () => cambiarModo('prevision');
 setInterval(() => { if (modo === 'moviola') panel(); }, 600);
 
 // ---- arranque ----
@@ -512,8 +520,9 @@ medir(); vista = encuadre(ZONAS[0][1]); sEsp = vista.s;
 new ResizeObserver(() => { const z = vista.s / sEsp; medir(); sEsp = encuadre(ZONAS[0][1]).s; vista = { ...vista, s: sEsp * z }; }).observe(caja);
 requestAnimationFrame(dibujar);
 await pedir();
-if (location.hash === '#repeticion') cambiarModo('moviola');
-addEventListener('hashchange', () => cambiarModo(location.hash === '#repeticion' ? 'moviola' : 'vivo'));
+const modoDeEnlace = () => ({ '#repeticion': 'moviola', '#prevision': 'prevision' })[location.hash] ?? 'vivo';
+if (modoDeEnlace() !== 'vivo') cambiarModo(modoDeEnlace());
+addEventListener('hashchange', () => cambiarModo(modoDeEnlace()));
 setInterval(pedir, CADA);
 setInterval(pintarEstado, 1000);
 })();
