@@ -52,6 +52,7 @@
           <div class="cifra"><b id="kMal">—</b><span>llevan más de 15 min</span></div>
         </div>
         <div class="barras" id="barras"></div>
+        <div class="salud"><div class="salud-cab"><span>Trenes en hora, hoy</span><span id="saludTxt"></span></div><div id="salud"></div></div>
       </div>
       <div class="bloque">
         <h2>Los que más tarde van</h2>
@@ -165,7 +166,7 @@ async function pedir() {
     if (!r.ok) throw new Error(r.status);
     aplicar(await r.json()); fallos = 0;
   } catch { fallos++; }
-  pintarEstado(); panel();
+  pintarEstado(); panel(); apuntarSalud();
 }
 
 // ---- moviola: lo grabado hoy por la caja negra, reproducido acelerado ----
@@ -197,7 +198,7 @@ async function abrirMoviola() {
   document.getElementById('reloj').textContent = 'Cargando…';
   if (!hist) {
     try {
-      const j = await fetch('/api/historia').then(r => r.json());
+      const j = await historiaDeHoy;
       hist = { t: j.t, trenes: j.trenes.map(h => { const f = new Array(j.t.length).fill(null); for (const [i, lo, la, d] of h.p) f[i] = [X(lo), Y(la), d]; return { ...h, f }; }) };
     } catch { hist = { t: [], trenes: [] }; }
   }
@@ -376,6 +377,36 @@ fetch('/base/familias.json').then(r => r.json()).then(F => {
 }).catch(() => { document.querySelector('.familias')?.remove(); });
 
 const colorDe = e => color(modo === 'prevision' && e.pred != null ? e.pred : e.d);
+// ---- salud de la red: % de trenes en hora a lo largo del día (lo grabado + lo que llega en directo) ----
+const historiaDeHoy = fetch('/api/historia').then(r => r.json()).catch(() => ({ t: [], trenes: [] }));
+const salud = [];
+historiaDeHoy.then(j => {
+  const tot = j.t.map(() => [0, 0]);
+  for (const h of j.trenes) for (const [i, , , d] of h.p) { tot[i][0]++; if (d <= 5) tot[i][1]++; }
+  j.t.forEach((t, i) => { if (tot[i][0] > 50) salud.push([t, tot[i][1] / tot[i][0] * 100]); });
+  salud.sort((a, b) => a[0] - b[0]); dibujarSalud();
+});
+function apuntarSalud() {
+  if (!ultimaFoto) return;
+  const vivos = [...trenes.values()].filter(e => !e.fuera); if (vivos.length < 50) return;
+  const ultimo = salud.at(-1); if (ultimo && ultimaFoto - ultimo[0] < 60) return;
+  salud.push([ultimaFoto, vivos.filter(e => e.d <= 5).length / vivos.length * 100]); dibujarSalud();
+}
+function dibujarSalud() {
+  if (salud.length < 2) return;
+  const W = 280, H = 56, t0 = salud[0][0], t1 = salud.at(-1)[0];
+  const ys = salud.map(p => p[1]), lo = Math.max(0, Math.floor(Math.min(...ys) / 10) * 10 - 5), hi = Math.min(100, Math.ceil(Math.max(...ys) / 10) * 10 + 5);
+  const x = t => (t - t0) / (t1 - t0 || 1) * (W - 6) + 3, y = v => H - 4 - (v - lo) / (hi - lo) * (H - 10);
+  const linea = salud.map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join('');
+  const fin = salud.at(-1);
+  document.getElementById('salud').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="none">
+    <path d="${linea}L${x(t1)},${H}L${x(t0)},${H}Z" fill="${C.puntual}" fill-opacity=".12"/>
+    <path d="${linea}" fill="none" stroke="${C.puntual}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+    <circle cx="${x(fin[0])}" cy="${y(fin[1])}" r="3" fill="${C.puntual}"/></svg>`;
+  const h = t => new Date(t * 1000).toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' });
+  document.getElementById('saludTxt').textContent = `${h(t0)} ${Math.round(salud[0][1])} % → ${h(t1)} ${Math.round(fin[1])} %`;
+}
+
 const rutaTren = e => e.k === 'l' ? `${e.o} → ${e.dst}` : (e.s ? `próxima: ${e.s}` : `tren ${e.num}`);
 const escapa = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function pintarEstado() {

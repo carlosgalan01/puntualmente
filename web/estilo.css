@@ -170,3 +170,6 @@ body { margin: 0; }
 .leyenda-prev { position: absolute; right: 56px; top: 12px; max-width: 260px; font-size: 12.5px; line-height: 1.4; color: var(--tenue); background: color-mix(in srgb, var(--noche) 88%, transparent); border: 1px solid var(--ambar); border-radius: 4px; padding: 8px 10px; }
 .leyenda-prev b { color: var(--texto); }
 @media (max-width: 760px) { .leyenda-prev { top: auto; bottom: 92px; right: 12px; left: 12px; max-width: none; } }
+.salud { display: grid; gap: 4px; border-top: 1px solid var(--raya); padding-top: 10px; }
+.salud-cab { display: flex; justify-content: space-between; gap: 8px; font: 11.5px var(--dato); color: var(--tenue); flex-wrap: wrap; }
+.salud svg { display: block; height: 56px; }
