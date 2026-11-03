@@ -85,7 +85,49 @@ footer a { color: var(--texto); }
 /* ---- web propia (fuera de claude.ai) ---- */
 *, *::before, *::after { box-sizing: border-box; }
 body { margin: 0; }
+[hidden] { display: none !important; }
 .mando .estado-vivo { font-family: var(--dato); font-size: 12px; color: var(--tenue); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .mando .estado-vivo b { color: var(--texto); font-weight: 600; }
 .mando .estado-vivo.error b { color: var(--rojo); }
 .paso a, .entradilla a { color: var(--texto); }
+
+/* buscador */
+.buscador { position: relative; }
+.buscador input { width: 100%; font: 500 15px var(--cuerpo); color: var(--texto); background: var(--panel); border: 1px solid var(--via); border-radius: 6px; padding: 11px 14px; }
+.buscador input::placeholder { color: var(--tenue); }
+.buscador input:focus { outline: none; border-color: var(--ambar); }
+#resultados { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; right: 0; list-style: none; margin: 0; padding: 4px 12px; background: var(--noche); border: 1px solid var(--linea); border-radius: 6px; box-shadow: 0 10px 30px rgb(0 0 0 / .5); }
+#resultados button, .lineas button { width: 100%; text-align: left; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 7px 0; border: 0; border-top: 1px solid var(--raya); background: none; color: var(--texto); cursor: pointer; font: inherit; }
+#resultados li:first-child button { border-top: 0; }
+#resultados button:hover .q, .lineas button:hover .q { color: var(--ambar); }
+.vacio { color: var(--tenue); font-size: 13px; padding: 8px 0; list-style: none; }
+
+/* tren seguido */
+.seguido { position: absolute; left: 12px; top: 52px; background: var(--noche); border: 1px solid var(--linea); border-radius: 4px; padding: 9px 11px; font-size: 13px; line-height: 1.35; max-width: 250px; box-shadow: 0 6px 20px rgb(0 0 0 / .4); display: grid; gap: 1px; }
+.seguido .t { font-family: var(--rotulo); font-weight: 600; font-size: 16px; }
+.seguido .s { color: var(--tenue); }
+.seguido .r { font-family: var(--dato); font-weight: 600; margin-top: 3px; }
+.seguido button { justify-self: start; margin-top: 6px; font: 600 12px var(--rotulo); letter-spacing: .04em; color: var(--texto); background: none; border: 1px solid var(--via); border-radius: 3px; padding: 3px 8px; cursor: pointer; }
+
+/* dónde está el problema */
+.problema { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.problema .col { background: var(--panel); border: 1px solid var(--raya); border-radius: 6px; padding: 16px 18px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.problema h2 { font-family: var(--display); font-weight: 800; font-size: 28px; line-height: 1; margin: 0; }
+.problema .sub { margin: 0 0 4px; color: var(--tenue); font-size: 13.5px; }
+.lineas, .avisos { list-style: none; margin: 0; padding: 0; display: grid; }
+.lineas button { grid-template-columns: 150px 1fr 48px; align-items: center; }
+.lineas li:first-child button { border-top: 0; }
+.lineas .b { height: 10px; border-radius: 2px; background: var(--raya); position: relative; overflow: hidden; }
+.lineas .b i { position: absolute; inset: 0 auto 0 0; border-radius: 2px; transition: width .4s; }
+.lineas .min { grid-row: auto; grid-column: auto; text-align: right; }
+.lineas .ruta { grid-column: 1 / -1; font-size: 12px; }
+.avisos li { border-top: 1px solid var(--raya); padding: 9px 0; display: grid; gap: 4px; }
+.avisos li:first-child { border-top: 0; }
+.avisos p { margin: 0; font-size: 13.5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+.avisos p.abierto { -webkit-line-clamp: unset; }
+.avisos .cab { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.chip { font: 600 11.5px var(--rotulo); letter-spacing: .04em; padding: 1px 7px; border-radius: 3px; background: var(--raya); color: var(--texto); }
+.chip.linea { background: none; border: 1px solid var(--via); }
+.cuando { margin-left: auto; font: 11px var(--dato); color: var(--tenue); }
+@media (max-width: 960px) { .problema { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 560px) { .lineas button { grid-template-columns: 110px 1fr 44px; } .seguido { top: auto; bottom: 92px; max-width: calc(100% - 24px); } }
