@@ -41,6 +41,8 @@ def main():
         antes = [o[1] for o in obs if o[0] < mitad] or [0]; despues = [o[1] for o in obs if o[0] >= mitad] or [0]
         rasgos = [d.mean(), d.std(), (d > 15).mean() * 100, np.mean(despues) - np.mean(antes)]
         lineas.append(linea); X.append(rasgos)
+    if len(lineas) < 20:
+        print(f"sólo {len(lineas)} líneas con datos suficientes; se dejan las familias anteriores"); return
     X = np.array(X)
     km = KMeans(n_clusters=a.grupos, n_init=20, random_state=7).fit(StandardScaler().fit_transform(X))
     # el nombre de cada grupo sale de su retraso medio: el que menos, «Van en hora»; el que más, «Muy mal»
