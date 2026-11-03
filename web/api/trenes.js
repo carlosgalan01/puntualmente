@@ -9,11 +9,7 @@ const FUENTES = {
   avisos: "https://gtfsrt.renfe.com/alerts.json",
 };
 
-// Núcleo de Cercanías según las dos primeras cifras del viaje o de la línea
-const NUCLEOS = {
-  10: "Madrid", 20: "Asturias", 30: "Sevilla", 31: "Cádiz", 32: "Málaga", 40: "Valencia", 41: "Murcia/Alicante",
-  45: "Cartagena", 46: "Ferrol", 47: "León", 50: "Rodalies", 51: "Rodalies", 60: "Bilbao", 61: "San Sebastián", 62: "Cantabria", 70: "Zaragoza",
-};
+const { NUCLEOS } = require("./_nucleos.js");
 
 // Si una fuente falla, se sirve la última buena (mientras esta instancia siga viva) en vez de dejar el mapa sin esos trenes
 const ultimaBuena = {};

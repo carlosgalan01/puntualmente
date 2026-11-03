@@ -15,7 +15,7 @@ for e in pos["entity"]:
         continue
     tid = v["trip"]["tripId"]
     filas.append(["cercanias", v.get("vehicle", {}).get("label", tid), v["position"]["latitude"], v["position"]["longitude"],
-                  round(retraso.get(tid, 0) / 60), v.get("stopId", ""), v.get("currentStatus", ""), v.get("timestamp", "")])
+                  round(retraso.get(tid, 0) / 60), v.get("stopId", ""), f'{v.get("currentStatus", "")}|{tid}', v.get("timestamp", "")])
 ld = leer("https://tiempo-real.largorecorrido.renfe.com/renfe-visor/flotaLD.json")
 for t in ld["trenes"]:
     filas.append(["larga", t["codComercial"], t["latitud"], t["longitud"], t.get("ultRetraso") or 0,

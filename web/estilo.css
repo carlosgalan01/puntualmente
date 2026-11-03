@@ -131,3 +131,11 @@ body { margin: 0; }
 .cuando { margin-left: auto; font: 11px var(--dato); color: var(--tenue); }
 @media (max-width: 960px) { .problema { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 560px) { .lineas button { grid-template-columns: 110px 1fr 44px; } .seguido { top: auto; bottom: 92px; max-width: calc(100% - 24px); } }
+
+/* directo / moviola */
+.mando { flex-wrap: wrap; }
+.modos { display: flex; }
+.modos button { font: 600 13px var(--rotulo); letter-spacing: .04em; color: var(--tenue); background: color-mix(in srgb, var(--noche) 80%, transparent); border: 1px solid var(--via); padding: 4px 10px; cursor: pointer; }
+.modos button:first-child { border-radius: 3px 0 0 3px; } .modos button:last-child { border-radius: 0 3px 3px 0; border-left: 0; }
+.modos button[aria-pressed="true"] { color: var(--noche); background: var(--texto); border-color: var(--texto); }
+.moviola { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 200px; }

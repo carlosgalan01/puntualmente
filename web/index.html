@@ -18,7 +18,7 @@
       <h1>Andén</h1>
       <p class="entradilla">Todos los trenes de Renfe que circulan <b>ahora mismo</b>, en el mapa con su retraso real. Se actualiza solo cada 15 segundos con los datos abiertos de Renfe.</p>
     </div>
-    <div class="sello"><span><span class="rec"></span>En directo</span><strong id="tramo">Conectando…</strong><span id="cuantos">—</span></div>
+    <div class="sello"><span id="selloModo"><span class="rec"></span>En directo</span><strong id="tramo">Conectando…</strong><span id="cuantos">—</span></div>
   </header>
 
   <section class="cuadro">
@@ -30,7 +30,11 @@
       <div class="leyenda">
         <span><i style="background:var(--puntual)"></i>En hora</span><span><i style="background:var(--leve)"></i>3–5 min</span><span><i style="background:var(--ambar)"></i>6–15 min</span><span><i style="background:var(--rojo)"></i>Más de 15</span><span>◯ larga y media distancia</span>
       </div>
-      <div class="mando"><span class="estado-vivo" id="vivo">Pidiendo los datos a Renfe…</span></div>
+      <div class="mando">
+        <div class="modos" role="group" aria-label="Qué ver"><button id="mVivo" aria-pressed="true">En directo</button><button id="mMoviola" aria-pressed="false">Moviola de hoy</button></div>
+        <span class="estado-vivo" id="vivo">Pidiendo los datos a Renfe…</span>
+        <div class="moviola" id="moviola" hidden><button class="play" id="play" aria-label="Pausar">❚❚</button><span class="reloj" id="reloj">--:--</span><input type="range" id="linea" min="0" max="1000" value="0" aria-label="Momento del día"><span class="vel" id="vel"></span></div>
+      </div>
       <div class="ficha" id="ficha" hidden></div>
     </div>
 
@@ -142,6 +146,57 @@ async function pedir() {
   pintarEstado(); panel();
 }
 
+// ---- moviola: lo grabado hoy por la caja negra, reproducido acelerado ----
+let modo = 'vivo', hist = null, tt = 0, playH = true, velH = 600, ultimaLista = [];
+function estadoH(h, t) {
+  const T = hist.t, n = T.length; if (!n) return null;
+  if (n === 1) { const a = h.f[0]; return a && [a[0], a[1], a[2], 1]; }
+  let i = 0; while (i < n - 2 && T[i + 1] <= t) i++;
+  const a = h.f[i], b = h.f[i + 1], u = Math.min(1, Math.max(0, (t - T[i]) / (T[i + 1] - T[i] || 1)));
+  if (a && b) return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, u < .5 ? a[2] : b[2], 1];
+  if (a) return u < .5 ? [a[0], a[1], a[2], 1 - u * 2] : null;
+  if (b) return u > .5 ? [b[0], b[1], b[2], (u - .5) * 2] : null;
+  return null;
+}
+const enDirecto = () => modo === 'vivo' || !(hist?.t.length > 1);
+function actuales(ahora) {
+  if (enDirecto()) return [...trenes.values()].map(e => ({ e, p: pos(e, ahora), a: alfa(e, ahora), r: e.rastro }));
+  const out = [];
+  for (const h of hist.trenes) {
+    const st = estadoH(h, tt); if (!st) continue;
+    h.d = st[2]; const atras = estadoH(h, tt - 600);
+    out.push({ e: h, p: [st[0], st[1]], a: st[3], r: atras ? [[atras[0], atras[1]]] : [] });
+  }
+  return out;
+}
+const trenesAhora = () => enDirecto() ? [...trenes.values()].filter(e => !e.fuera) : ultimaLista.filter(o => o.a > .3).map(o => o.e);
+const posicionDe = id => ultimaLista.find(o => o.e.id === id)?.p;
+async function abrirMoviola() {
+  document.getElementById('reloj').textContent = 'Cargando…';
+  if (!hist) {
+    try {
+      const j = await fetch('/api/historia').then(r => r.json());
+      hist = { t: j.t, trenes: j.trenes.map(h => { const f = new Array(j.t.length).fill(null); for (const [i, lo, la, d] of h.p) f[i] = [X(lo), Y(la), d]; return { ...h, f }; }) };
+    } catch { hist = { t: [], trenes: [] }; }
+  }
+  if (hist.t.length < 2) { document.getElementById('reloj').textContent = 'Aún no hay grabaciones de hoy: mientras, el mapa sigue en directo'; return; }
+  const dur = hist.t.at(-1) - hist.t[0];
+  velH = Math.max(60, Math.round(dur / 60));
+  document.getElementById('vel').textContent = '×' + velH;
+  tt = hist.t[0]; playH = !sinMovimiento; ponPlay(playH);
+}
+function cambiarModo(m) {
+  modo = m;
+  document.getElementById('mVivo').setAttribute('aria-pressed', m === 'vivo');
+  document.getElementById('mMoviola').setAttribute('aria-pressed', m === 'moviola');
+  document.getElementById('vivo').hidden = m !== 'vivo';
+  document.getElementById('moviola').hidden = m === 'vivo';
+  foco = null; siguiendo = false; seguido();
+  document.getElementById('selloModo').innerHTML = m === 'vivo' ? '<span class="rec"></span>En directo' : 'Moviola de hoy';
+  if (m === 'moviola') { document.getElementById('tramo').textContent = 'Lo grabado hoy'; abrirMoviola(); } else { pintarEstado(); }
+  panel();
+}
+
 // ---- lienzo y vista ----
 const lienzo = document.getElementById('lienzo'), ctx = lienzo.getContext('2d'), caja = document.getElementById('mapa');
 let W = 0, H = 0, dpr = 1;
@@ -162,14 +217,25 @@ const CIUDADES = [['Madrid', -3.70, 40.42], ['Barcelona', 2.17, 41.39], ['Valenc
 function volar(dest, ms = 1100) { if (sinMovimiento) { vista = dest; return; } viaje = { de: { ...vista }, a: dest, t0: performance.now(), ms }; }
 const suave = u => u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
 
+let ultimoCuadro = performance.now(), arrastrando = false;
 function dibujar(ahora) {
+  const dt = Math.min(100, ahora - ultimoCuadro); ultimoCuadro = ahora;
+  if (modo === 'moviola' && hist?.t.length > 1) {
+    const T0 = hist.t[0], T1 = hist.t.at(-1);
+    if (playH && !arrastrando) { tt += dt / 1000 * velH; if (tt > T1 + velH) tt = T0; }
+    if (!arrastrando) document.getElementById('linea').value = Math.round((Math.min(tt, T1) - T0) / (T1 - T0) * 1000);
+    document.getElementById('reloj').textContent = new Date(Math.min(tt, T1) * 1000).toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' });
+  }
+  const lista = actuales(ahora);
+  ultimaLista = lista;
   if (viaje) {
     const u = Math.min(1, (ahora - viaje.t0) / viaje.ms), e = suave(u), { de, a } = viaje;
     vista = { cx: de.cx + (a.cx - de.cx) * e, cy: de.cy + (a.cy - de.cy) * e, s: Math.exp(Math.log(de.s) + (Math.log(a.s) - Math.log(de.s)) * e) };
     if (u >= 1) viaje = null;
   }
-  if (siguiendo && !viaje && trenes.has(foco)) {
-    const [fx, fy] = pos(trenes.get(foco), ahora);
+  const fp = siguiendo && !viaje && foco && lista.find(o => o.e.id === foco)?.p;
+  if (fp) {
+    const [fx, fy] = fp;
     vista = { ...vista, cx: vista.cx + (fx - vista.cx) * .06, cy: vista.cy + (fy - vista.cy) * .06 };
   }
   const { cx, cy, s } = vista, z = s / sEsp;
@@ -191,15 +257,15 @@ function dibujar(ahora) {
   }
   puntos = [];
   ctx.globalCompositeOperation = 'lighter';
-  for (const e of trenes.values()) {
-    const [wx, wy] = pos(e, ahora), a = alfa(e, ahora); if (a <= 0.01) continue;
+  for (const { e, p: [wx, wy], a, r: rastro } of lista) {
+    if (a <= 0.01) continue;
     const x = sx(wx), y = sy(wy); puntos.push([e, x, y, a]);
     if (fuera(x, y)) continue;
     const col = color(e.d);
     ctx.globalAlpha = a * .22; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r0 * 2.6, 0, 7); ctx.fill();
-    if (e.rastro.length && z > 1.5) {
+    if (rastro.length && z > 1.5) {
       ctx.globalAlpha = a * .35; ctx.strokeStyle = col; ctx.lineWidth = r0 * .7; ctx.beginPath();
-      e.rastro.forEach(([px, py], i) => i ? ctx.lineTo(sx(px), sy(py)) : ctx.moveTo(sx(px), sy(py))); ctx.lineTo(x, y); ctx.stroke();
+      rastro.forEach(([px, py], i) => i ? ctx.lineTo(sx(px), sy(py)) : ctx.moveTo(sx(px), sy(py))); ctx.lineTo(x, y); ctx.stroke();
     }
   }
   ctx.globalCompositeOperation = 'source-over';
@@ -225,6 +291,7 @@ const nombreTren = e => e.k === 'l' ? `${e.n} ${e.num}` : `${e.n} ${e.z || 'Cerc
 const rutaTren = e => e.k === 'l' ? `${e.o} → ${e.dst}` : (e.s ? `próxima: ${e.s}` : `tren ${e.num}`);
 const escapa = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function pintarEstado() {
+  if (modo !== 'vivo') return;
   const v = document.getElementById('vivo');
   if (fallos && !ultimaFoto) { v.className = 'estado-vivo error'; v.innerHTML = '<b>Renfe no responde ahora mismo.</b> Lo vuelvo a intentar en 15 segundos.'; return; }
   const hace = Math.max(0, Math.round(Date.now() / 1000 - ultimaFoto));
@@ -233,7 +300,7 @@ function pintarEstado() {
   document.getElementById('tramo').textContent = hora(ultimaFoto);
 }
 function panel() {
-  const vivos = [...trenes.values()].filter(e => !e.fuera);
+  const vivos = trenesAhora();
   const n = vivos.length || 1;
   document.getElementById('cuantos').textContent = `${vivos.length} trenes en el mapa`;
   document.getElementById('kTotal').textContent = vivos.length;
@@ -251,20 +318,20 @@ function panel() {
   seguido();
 }
 function seguido() {
-  const caja = document.getElementById('seguido'), e = foco && trenes.get(foco);
+  const caja = document.getElementById('seguido'), e = foco && trenesAhora().find(x => x.id === foco);
   if (!e) { caja.hidden = true; return; }
   caja.innerHTML = `<div class="t">${escapa(nombreTren(e))}${e.k === 'c' ? ` · tren ${escapa(e.num)}` : ''}</div><div class="s">${e.k === 'l' ? escapa(`${e.o} → ${e.dst}`) : 'Cercanías'}</div>${e.s ? `<div class="s">Siguiente: ${escapa(e.s)}</div>` : ''}<div class="r" style="color:${color(e.d)}">${e.d <= 0 ? 'En hora' : `+${e.d} min de retraso`}</div><button id="soltar">${siguiendo ? 'Dejar de seguirlo' : 'Seguirlo'}</button>`;
   caja.hidden = false;
   document.getElementById('soltar').onclick = () => { if (siguiendo) { siguiendo = false; foco = null; } else siguiendo = true; seguido(); };
 }
-function irA(e) { foco = e.id; siguiendo = true; marcar(null); setTimeout(seguido); const [x, y] = pos(e, performance.now()); volar({ cx: x, cy: y, s: Math.max(vista.s, sEsp * 9) }); }
+function irA(e) { foco = e.id; siguiendo = true; marcar(null); setTimeout(seguido); const [x, y] = posicionDe(e.id) ?? pos(e, performance.now()); volar({ cx: x, cy: y, s: Math.max(vista.s, sEsp * 9) }); }
 
 // ---- dónde está el problema: líneas de Cercanías por retraso medio, y avisos oficiales ----
 const haceCuanto = t => { const m = Math.round((Date.now() / 1000 - t) / 60); return m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : new Date(t * 1000).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }); };
 function problema() {
   const grupos = new Map();
-  for (const e of trenes.values()) {
-    if (e.fuera || e.k !== 'c' || !e.z) continue;
+  for (const e of trenesAhora()) {
+    if (e.k !== 'c' || !e.z) continue;
     const k = `${e.n} ${e.z}`; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(e);
   }
   const filas = [...grupos].filter(([, l]) => l.length >= 2)
@@ -274,7 +341,7 @@ function problema() {
   const ol = document.getElementById('lineas');
   ol.innerHTML = filas.map((f, i) => `<li><button data-i="${i}"><span class="q">${escapa(f.k)}</span><span class="b"><i style="width:${f.media / max * 100}%;background:${color(f.media)}"></i></span><span class="min" style="color:${color(f.media)}">+${Math.round(f.media)}′</span><span class="ruta">${f.l.length} trenes en marcha</span></button></li>`).join('') || '<li class="vacio">Esperando datos…</li>';
   ol.querySelectorAll('button').forEach(b => b.onclick = () => {
-    const l = filas[+b.dataset.i].l, ps = l.map(e => pos(e, performance.now()));
+    const l = filas[+b.dataset.i].l, ps = l.map(e => posicionDe(e.id)).filter(Boolean);
     const xs = ps.map(p => p[0]), ys = ps.map(p => p[1]);
     const lo0 = Math.min(...xs) / K, lo1 = Math.max(...xs) / K, la0 = -Math.max(...ys), la1 = -Math.min(...ys);
     const pad = .08; foco = null; siguiendo = false; marcar(null);
@@ -292,7 +359,7 @@ const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLow
 function buscar() {
   const q = norm(busca.value.trim());
   if (q.length < 2) { resultados.hidden = true; return; }
-  const encontrados = [...trenes.values()].filter(e => !e.fuera && [e.num, e.n, e.z, e.o, e.dst, e.s, nombreTren(e)].some(c => norm(c).includes(q)))
+  const encontrados = trenesAhora().filter(e => [e.num, e.n, e.z, e.o, e.dst, e.s, nombreTren(e)].some(c => norm(c).includes(q)))
     .sort((a, b) => b.d - a.d).slice(0, 7);
   resultados.innerHTML = encontrados.map((e, i) => `<li><button data-i="${i}"><span class="q">${escapa(nombreTren(e))}${e.k === 'c' ? ` · ${escapa(e.num)}` : ''}</span><span class="ruta">${escapa(rutaTren(e))}</span><span class="min" style="color:${color(e.d)}">${e.d > 0 ? `+${e.d}′` : 'en hora'}</span></button></li>`).join('') || '<li class="vacio">Ningún tren en marcha coincide.</li>';
   resultados.hidden = false;
@@ -338,11 +405,22 @@ lienzo.addEventListener('pointermove', ev => {
 });
 lienzo.addEventListener('pointerleave', () => { ficha.hidden = true; });
 
+const bPlay = document.getElementById('play'), rango = document.getElementById('linea');
+function ponPlay(v) { playH = v; bPlay.textContent = v ? '❚❚' : '▶'; bPlay.setAttribute('aria-label', v ? 'Pausar' : 'Reproducir'); }
+bPlay.onclick = () => ponPlay(!playH);
+rango.addEventListener('input', () => { if (!hist?.t.length) return; arrastrando = true; tt = hist.t[0] + rango.value / 1000 * (hist.t.at(-1) - hist.t[0]); });
+rango.addEventListener('change', () => { arrastrando = false; });
+document.getElementById('mVivo').onclick = () => cambiarModo('vivo');
+document.getElementById('mMoviola').onclick = () => cambiarModo('moviola');
+setInterval(() => { if (modo === 'moviola') panel(); }, 600);
+
 // ---- arranque ----
 medir(); vista = encuadre(ZONAS[0][1]); sEsp = vista.s;
 new ResizeObserver(() => { const z = vista.s / sEsp; medir(); sEsp = encuadre(ZONAS[0][1]).s; vista = { ...vista, s: sEsp * z }; }).observe(caja);
 requestAnimationFrame(dibujar);
 await pedir();
+if (location.hash === '#repeticion') cambiarModo('moviola');
+addEventListener('hashchange', () => cambiarModo(location.hash === '#repeticion' ? 'moviola' : 'vivo'));
 setInterval(pedir, CADA);
 setInterval(pintarEstado, 1000);
 })();
