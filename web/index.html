@@ -73,13 +73,23 @@
     </div>
   </section>
 
+  <section class="modelo-ia">
+    <div>
+      <h2>El modelo, con sus números</h2>
+      <p>Una red neuronal pequeña (dos capas, 24 y 12 neuronas) que mira el retraso de cada tren, cómo ha cambiado en los últimos minutos, su velocidad, la hora, la zona y el tipo de tren, y estima su retraso unos minutos después. Se compara siempre con la apuesta más simple, «seguirá igual», con trenes que la red no ha visto al entrenar. Pulsa cualquier tren del mapa para ver su estimación.</p>
+      <p class="nota">Esta versión 0 se ha entrenado con sólo 10 minutos de datos, y en general todavía no gana a «seguirá igual»: casi ningún retraso cambia en 5 minutos. Cuando el retraso sí cambia, se equivoca algo menos. Cada noche se reentrena con todo lo grabado, a 30 minutos vista.</p>
+      <p class="version" id="modeloVersion"></p>
+    </div>
+    <div class="cifras modelo" id="modelo"></div>
+  </section>
+
   <section class="ia">
     <h2>Lo que la IA va a hacer con esto</h2>
     <p>Esto de arriba es la materia prima: dónde está cada tren y cuánto retraso lleva. Cada 5 minutos se guarda una foto de toda la red en <a href="https://github.com/carlosgalan01/puntualmente" target="_blank" rel="noopener">la caja negra del proyecto</a>. Con unas semanas grabadas, encima van tres piezas.</p>
     <div class="pasos">
-      <div class="paso"><span class="estado on">● Grabando desde el 3/11</span><h3>Predecir el retraso a la llegada</h3><p>Un modelo aprende cómo se comporta cada línea según la hora, el día y el retraso que ya lleva el tren, y estima con cuánto llegará a destino.</p></div>
+      <div class="paso"><span class="estado on">● Versión 0 en marcha</span><h3>Predecir el retraso a la llegada</h3><p>Un modelo aprende cómo se comporta cada línea según la hora, el día y el retraso que ya lleva el tren, y estima con cuánto llegará a destino.</p></div>
       <div class="paso"><span class="estado prox">Por entrenar</span><h3>Avisar antes que el aviso oficial</h3><p>Cuando una línea empieza a ir peor de lo normal para esa hora, se marca como posible incidencia, siempre separada de los avisos que publica Renfe.</p></div>
-      <div class="paso"><span class="estado prox">Próximamente</span><h3>La moviola del día</h3><p>Pasar un día entero en un minuto para ver cómo un retraso se contagia de un tren a los que vienen detrás.</p></div>
+      <div class="paso"><span class="estado ya">Ya en la web</span><h3>La moviola del día</h3><p>Pasar un día entero en un minuto para ver cómo un retraso se contagia de un tren a los que vienen detrás.</p></div>
     </div>
   </section>
 
@@ -124,10 +134,11 @@ function aplicar(j) {
     vistos.add(t.id);
     const nuevo = [X(t.lon), Y(t.lat)];
     let e = trenes.get(t.id);
-    if (!e) { trenes.set(t.id, { ...t, de: nuevo, a: nuevo, t0: ahora, al0: ultimaFoto ? 0 : 1, al1: 1, rastro: [] }); continue; }
+    if (!e) { trenes.set(t.id, { ...t, de: nuevo, a: nuevo, t0: ahora, al0: ultimaFoto ? 0 : 1, al1: 1, rastro: [], hist: [[j.t, t.d, t.lat, t.lon]] }); continue; }
     const p = pos(e, ahora), salto = Math.hypot(nuevo[0] - p[0], nuevo[1] - p[1]) > .4;
     if (!salto) { e.rastro.push(p); if (e.rastro.length > 8) e.rastro.shift(); } else e.rastro = [];
     Object.assign(e, t, { de: salto ? nuevo : p, a: nuevo, t0: ahora, al0: alfa(e, ahora), al1: 1, fuera: false });
+    e.hist.push([j.t, t.d, t.lat, t.lon]); if (e.hist.length > 60) e.hist.shift();
   }
   for (const [id, e] of trenes) {
     if (vistos.has(id) || !llego[e.k]) continue;
@@ -288,6 +299,36 @@ function dibujar(ahora) {
 const hora = t => new Date(t * 1000).toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid' });
 const TRAMOS = [['En hora', 0, 2], ['3–5 min', 3, 5], ['6–15 min', 6, 15], ['16–30', 16, 30], ['Más de 30', 31, 1e9]];
 const nombreTren = e => e.k === 'l' ? `${e.n} ${e.num}` : `${e.n} ${e.z || 'Cercanías'}`;
+// ---- el modelo: red neuronal entrenada con lo grabado (modelo/entrenar.py), ejecutada aquí mismo ----
+let MODELO = null;
+fetch('/base/modelo.json').then(r => r.json()).then(m => { MODELO = m; tarjetaModelo(); }).catch(() => {});
+const kmEntre = (a, b) => { const dy = (a[0] - b[0]) * 111, dx = (a[1] - b[1]) * 111 * Math.cos(a[0] * Math.PI / 180); return Math.hypot(dx, dy); };
+function predecir(e) {
+  if (!MODELO || !e.hist?.length) return null;
+  const H = e.hist, [t, d, lat, lon] = H[H.length - 1], objetivo = t - MODELO.tendencia_min * 60;
+  let antes = null; for (const h of H) if (Math.abs(h[0] - objetivo) <= 90 && (!antes || Math.abs(h[0] - objetivo) < Math.abs(antes[0] - objetivo))) antes = h;
+  const hora = +new Date(t * 1000).toLocaleString('en-GB', { timeZone: 'Europe/Madrid', hour: '2-digit', hour12: false }) % 24;
+  const kmh = antes ? kmEntre([lat, lon], [antes[2], antes[3]]) / (MODELO.tendencia_min / 60) : 0;
+  const x = [d, antes ? d - antes[1] : 0, Math.min(kmh, 320), antes ? 1 : 0, e.k === 'l' ? 1 : 0, Math.sin(2 * Math.PI * hora / 24), Math.cos(2 * Math.PI * hora / 24),
+    ...MODELO.zonas.map(z => e.z === z ? 1 : 0), ...MODELO.productos.map(p => e.n === p ? 1 : 0)];
+  let v = x.map((xi, i) => (xi - MODELO.media[i]) / (MODELO.escala[i] || 1));
+  MODELO.capas.forEach((c, li) => {
+    const out = c.b.slice();
+    for (let i = 0; i < v.length; i++) for (let j = 0; j < out.length; j++) out[j] += v[i] * c.w[i][j];
+    v = li < MODELO.capas.length - 1 ? out.map(o => Math.max(0, o)) : out;
+  });
+  return Math.max(0, Math.round(d + MODELO.confianza * v[0]));
+}
+const lineaIA = e => { const p = predecir(e); if (p === null) return ''; const dif = p - e.d;
+  return `<div class="ia-pred">IA · en ${MODELO.horizonte_min} min: <b style="color:${color(p)}">${p <= 0 ? 'en hora' : '+' + p + ' min'}</b> ${dif > 0 ? '↑ empeora' : dif < 0 ? '↓ recupera' : '= igual'}</div>`; };
+function tarjetaModelo() {
+  const ev = MODELO.evaluacion, caja = document.getElementById('modelo'); if (!caja) return;
+  caja.innerHTML = `<div class="cifra"><b>${ev.ejemplos.toLocaleString('es-ES')}</b><span>ejemplos de ${ev.trenes} trenes</span></div>
+    <div class="cifra"><b>${ev.error_red_min.toString().replace('.', ',')} min</b><span>error medio de la red</span></div>
+    <div class="cifra"><b>${ev.error_seguira_igual_min.toString().replace('.', ',')} min</b><span>error de «seguirá igual»</span></div>
+    <div class="cifra"><b>${ev.error_red_cuando_cambia?.toString().replace('.', ',')} / ${ev.error_igual_cuando_cambia?.toString().replace('.', ',')}</b><span>red / «igual» cuando el retraso cambia (${ev.porcentaje_que_cambia.toString().replace('.', ',')} % de los casos)</span></div>`;
+  document.getElementById('modeloVersion').textContent = `Versión del ${MODELO.version} · horizonte ${MODELO.horizonte_min} min · ${ev.fotos} fotos de la red`;
+}
 const rutaTren = e => e.k === 'l' ? `${e.o} → ${e.dst}` : (e.s ? `próxima: ${e.s}` : `tren ${e.num}`);
 const escapa = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function pintarEstado() {
@@ -320,7 +361,7 @@ function panel() {
 function seguido() {
   const caja = document.getElementById('seguido'), e = foco && trenesAhora().find(x => x.id === foco);
   if (!e) { caja.hidden = true; return; }
-  caja.innerHTML = `<div class="t">${escapa(nombreTren(e))}${e.k === 'c' ? ` · tren ${escapa(e.num)}` : ''}</div><div class="s">${e.k === 'l' ? escapa(`${e.o} → ${e.dst}`) : 'Cercanías'}</div>${e.s ? `<div class="s">Siguiente: ${escapa(e.s)}</div>` : ''}<div class="r" style="color:${color(e.d)}">${e.d <= 0 ? 'En hora' : `+${e.d} min de retraso`}</div><button id="soltar">${siguiendo ? 'Dejar de seguirlo' : 'Seguirlo'}</button>`;
+  caja.innerHTML = `<div class="t">${escapa(nombreTren(e))}${e.k === 'c' ? ` · tren ${escapa(e.num)}` : ''}</div><div class="s">${e.k === 'l' ? escapa(`${e.o} → ${e.dst}`) : 'Cercanías'}</div>${e.s ? `<div class="s">Siguiente: ${escapa(e.s)}</div>` : ''}<div class="r" style="color:${color(e.d)}">${e.d <= 0 ? 'En hora' : `+${e.d} min de retraso`}</div>${lineaIA(e)}<button id="soltar">${siguiendo ? 'Dejar de seguirlo' : 'Seguirlo'}</button>`;
   caja.hidden = false;
   document.getElementById('soltar').onclick = () => { if (siguiendo) { siguiendo = false; foco = null; } else siguiendo = true; seguido(); };
 }
@@ -399,7 +440,7 @@ lienzo.addEventListener('pointermove', ev => {
   for (const p of puntos) { const d = (p[1] - mx) ** 2 + (p[2] - my) ** 2; if (d < dm) { dm = d; mejor = p; } }
   if (!mejor) { ficha.hidden = true; return; }
   const e = mejor[0];
-  ficha.innerHTML = `<div class="t">${escapa(nombreTren(e))}${e.k === 'c' ? ` · tren ${escapa(e.num)}` : ''}</div><div class="s">${e.k === 'l' ? escapa(`${e.o} → ${e.dst}`) : 'Cercanías'}</div>${e.s ? `<div class="s">Siguiente: ${escapa(e.s)}</div>` : ''}<div class="r" style="color:${color(e.d)}">${e.d <= 0 ? 'En hora' : `+${e.d} min de retraso`}</div>`;
+  ficha.innerHTML = `<div class="t">${escapa(nombreTren(e))}${e.k === 'c' ? ` · tren ${escapa(e.num)}` : ''}</div><div class="s">${e.k === 'l' ? escapa(`${e.o} → ${e.dst}`) : 'Cercanías'}</div>${e.s ? `<div class="s">Siguiente: ${escapa(e.s)}</div>` : ''}<div class="r" style="color:${color(e.d)}">${e.d <= 0 ? 'En hora' : `+${e.d} min de retraso`}</div>${lineaIA(e)}`;
   ficha.hidden = false;
   ficha.style.left = Math.min(mx + 14, W - 250) + 'px'; ficha.style.top = Math.max(8, my - 70) + 'px';
 });

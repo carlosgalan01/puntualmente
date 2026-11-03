@@ -139,3 +139,14 @@ body { margin: 0; }
 .modos button:first-child { border-radius: 3px 0 0 3px; } .modos button:last-child { border-radius: 0 3px 3px 0; border-left: 0; }
 .modos button[aria-pressed="true"] { color: var(--noche); background: var(--texto); border-color: var(--texto); }
 .moviola { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 200px; }
+
+/* el modelo */
+.ia-pred { font: 12px var(--dato); color: var(--tenue); margin-top: 3px; }
+.ia-pred b { font-weight: 600; }
+.modelo-ia { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 24px; align-items: start; background: var(--panel); border: 1px solid var(--raya); border-radius: 6px; padding: 20px 22px; }
+.modelo-ia h2 { font: 800 30px/1 var(--display); margin: 0 0 10px; }
+.modelo-ia p { margin: 0 0 10px; color: var(--tenue); max-width: 62ch; }
+.modelo-ia .nota { color: var(--texto); border-left: 2px solid var(--ambar); padding-left: 12px; }
+.modelo-ia .version { font: 11.5px var(--dato); }
+.cifras.modelo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+@media (max-width: 860px) { .modelo-ia { grid-template-columns: minmax(0, 1fr); } }
