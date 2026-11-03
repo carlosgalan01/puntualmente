@@ -448,6 +448,15 @@ function pintarPanel() {
   document.getElementById('cerrarLetrero').onclick = () => { estacionAbierta = null; caja.hidden = true; };
 }
 
+// gráfica pequeña del retraso de un tren desde que se abrió la página
+function miniGrafica(e) {
+  const H = e.hist; if (!H || H.length < 3) return '<div class="mini-vacia">Su gráfica aparece en cuanto haya un par de minutos de datos.</div>';
+  const W = 220, A = 40, t0 = H[0][0], t1 = H.at(-1)[0], ds = H.map(h => h[1]), lo = Math.min(...ds, 0), hi = Math.max(...ds, lo + 5);
+  const x = t => 2 + (t - t0) / (t1 - t0 || 1) * (W - 4), y = d => A - 3 - (d - lo) / (hi - lo) * (A - 8);
+  const linea = H.map((h, i) => `${i ? 'L' : 'M'}${x(h[0]).toFixed(1)},${y(h[1]).toFixed(1)}`).join('');
+  const min = Math.round((t1 - t0) / 60);
+  return `<div class="mini"><svg viewBox="0 0 ${W} ${A}" width="100%"><path d="${linea}" fill="none" stroke="${color(e.d)}" stroke-width="1.8"/><circle cx="${x(t1)}" cy="${y(e.d)}" r="2.8" fill="${color(e.d)}"/></svg><span>retraso en los últimos ${min} min · de ${ds[0]}′ a ${e.d}′</span></div>`;
+}
 const rutaTren = e => e.k === 'l' ? `${e.o} → ${e.dst}` : (e.s ? `próxima: ${e.s}` : `tren ${e.num}`);
 const escapa = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function pintarEstado() {
@@ -481,7 +490,7 @@ function panel() {
 function seguido() {
   const caja = document.getElementById('seguido'), e = foco && trenesAhora().find(x => x.id === foco);
   if (!e) { caja.hidden = true; return; }
-  caja.innerHTML = `<div class="t">${escapa(nombreTren(e))}${e.k === 'c' ? ` · tren ${escapa(e.num)}` : ''}</div><div class="s">${e.k === 'l' ? escapa(`${e.o} → ${e.dst}`) : 'Cercanías'}</div>${e.s ? `<div class="s">Siguiente: ${escapa(e.s)}</div>` : ''}<div class="r" style="color:${color(e.d)}">${e.d <= 0 ? 'En hora' : `+${e.d} min de retraso`}</div>${lineaIA(e)}<button id="soltar">${siguiendo ? 'Dejar de seguirlo' : 'Seguirlo'}</button>`;
+  caja.innerHTML = `<div class="t">${escapa(nombreTren(e))}${e.k === 'c' ? ` · tren ${escapa(e.num)}` : ''}</div><div class="s">${e.k === 'l' ? escapa(`${e.o} → ${e.dst}`) : 'Cercanías'}</div>${e.s ? `<div class="s">Siguiente: ${escapa(e.s)}</div>` : ''}<div class="r" style="color:${color(e.d)}">${e.d <= 0 ? 'En hora' : `+${e.d} min de retraso`}</div>${lineaIA(e)}${miniGrafica(e)}<button id="soltar">${siguiendo ? 'Dejar de seguirlo' : 'Seguirlo'}</button>`;
   caja.hidden = false;
   document.getElementById('soltar').onclick = () => { if (siguiendo) { siguiendo = false; foco = null; } else siguiendo = true; seguido(); };
 }

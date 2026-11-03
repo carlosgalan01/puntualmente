@@ -203,3 +203,7 @@ body { margin: 0; }
 .letrero td.ret, .letrero td.pia { text-align: right; white-space: nowrap; font-weight: 600; }
 .letrero td.pia { color: var(--texto); }
 #resultados button.est .q { color: var(--ambar); }
+.mini { margin-top: 6px; display: grid; gap: 2px; }
+.mini svg { display: block; height: 40px; }
+.mini span, .mini-vacia { font: 11px var(--dato); color: var(--tenue); }
+.mini-vacia { margin-top: 4px; max-width: 220px; }
