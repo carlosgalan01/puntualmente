@@ -188,3 +188,18 @@ body { margin: 0; }
 .flujo.fino { stroke-dasharray: 5 5; }
 .punta { fill: var(--linea); }
 .diagrama .etq { font: 11.5px var(--dato); fill: var(--tenue); text-anchor: middle; }
+
+/* letrero de estación */
+.letrero { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); width: min(560px, calc(100% - 24px)); background: #05080d; border: 1px solid var(--linea); border-radius: 6px; padding: 12px 14px 14px; box-shadow: 0 16px 50px rgb(0 0 0 / .6); z-index: 4; }
+.letrero .cab { display: flex; justify-content: space-between; align-items: start; gap: 12px; margin-bottom: 8px; }
+.letrero .t { display: block; font: 600 11px var(--rotulo); letter-spacing: .14em; text-transform: uppercase; color: var(--tenue); }
+.letrero b { font: 800 26px/1.05 var(--display); color: var(--ambar); }
+.letrero .cab button { background: none; border: 1px solid var(--via); color: var(--texto); border-radius: 3px; width: 30px; height: 30px; font-size: 18px; cursor: pointer; }
+.letrero table { width: 100%; border-collapse: collapse; font: 13px var(--dato); }
+.letrero th { text-align: left; font: 600 11px var(--rotulo); letter-spacing: .1em; text-transform: uppercase; color: var(--tenue); padding: 4px 6px; border-bottom: 1px solid var(--raya); }
+.letrero td { padding: 6px; border-bottom: 1px dashed var(--raya); color: var(--ambar); vertical-align: top; }
+.letrero td.tren { font-weight: 600; white-space: nowrap; } .letrero td.tren span { display: block; color: var(--tenue); font-weight: 400; font-size: 11.5px; }
+.letrero td.de { color: #f6d79a; font-family: var(--cuerpo); font-size: 13px; }
+.letrero td.ret, .letrero td.pia { text-align: right; white-space: nowrap; font-weight: 600; }
+.letrero td.pia { color: var(--texto); }
+#resultados button.est .q { color: var(--ambar); }

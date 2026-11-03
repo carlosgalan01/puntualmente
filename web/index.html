@@ -42,6 +42,7 @@
       </div>
       <div class="leyenda-prev" id="leyendaPrev" hidden>Colores según el retraso que <b>la red neuronal estima</b> para dentro de unos minutos. Anillo ámbar: la IA cree que ese tren va a empeorar.</div>
       <div class="ficha" id="ficha" hidden></div>
+      <div class="letrero" id="letrero" hidden role="dialog" aria-label="Panel de estación"></div>
     </div>
 
     <aside>
@@ -434,6 +435,19 @@ function dibujarSalud() {
   document.getElementById('saludTxt').textContent = `${h(t0)} ${Math.round(salud[0][1])} % → ${h(t1)} ${Math.round(fin[1])} %`;
 }
 
+// ---- panel de estación: como el letrero del andén, con lo que estima la IA ----
+let estacionAbierta = null;
+function abrirPanel(est) { estacionAbierta = est; pintarPanel(); }
+function pintarPanel() {
+  const caja = document.getElementById('letrero'), est = estacionAbierta;
+  const lista = trenesAhora().filter(e => e.s === est || e.dst === est).sort((a, b) => (a.k === b.k ? b.d - a.d : a.k === 'l' ? -1 : 1)).slice(0, 10);
+  const fila = e => { const p = e.pred; return `<tr><td class="tren">${escapa(e.k === 'l' ? e.n : e.n)}<span>${escapa(e.num)}</span></td><td class="de">${escapa(e.k === 'l' ? (e.dst === est ? 'llega desde ' + e.o : 'pasa, va a ' + e.dst) : (e.z || 'Cercanías'))}</td><td class="ret" style="color:${color(e.d)}">${e.d > 0 ? '+' + e.d + '′' : 'en hora'}</td><td class="pia">${p != null && MODELO ? (p > 0 ? '+' + p + '′' : 'en hora') : '—'}</td></tr>`; };
+  caja.innerHTML = `<div class="cab"><div><span class="t">Próximos trenes hacia</span><b>${escapa(est)}</b></div><button id="cerrarLetrero" aria-label="Cerrar">×</button></div>
+    <table><thead><tr><th>Tren</th><th>Origen o línea</th><th>Retraso</th><th>IA ${MODELO ? MODELO.horizonte_min + ' min' : ''}</th></tr></thead><tbody>${lista.map(fila).join('') || '<tr><td colspan="4" class="de">Ahora mismo no va ningún tren hacia aquí.</td></tr>'}</tbody></table>`;
+  caja.hidden = false;
+  document.getElementById('cerrarLetrero').onclick = () => { estacionAbierta = null; caja.hidden = true; };
+}
+
 const rutaTren = e => e.k === 'l' ? `${e.o} → ${e.dst}` : (e.s ? `próxima: ${e.s}` : `tren ${e.num}`);
 const escapa = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function pintarEstado() {
@@ -461,6 +475,7 @@ function panel() {
   ol.querySelectorAll('button').forEach(b => b.onclick = () => irA(peores[+b.dataset.i]));
   problema();
   if (!resultados.hidden) buscar();
+  if (estacionAbierta) pintarPanel();
   seguido();
 }
 function seguido() {
@@ -519,9 +534,13 @@ function buscar() {
   if (q.length < 2) { resultados.hidden = true; return; }
   const encontrados = trenesAhora().filter(e => [e.num, e.n, e.z, e.o, e.dst, e.s, nombreTren(e)].some(c => norm(c).includes(q)))
     .sort((a, b) => b.d - a.d).slice(0, 7);
-  resultados.innerHTML = encontrados.map((e, i) => `<li><button data-i="${i}"><span class="q">${escapa(nombreTren(e))}${e.k === 'c' ? ` · ${escapa(e.num)}` : ''}</span><span class="ruta">${escapa(rutaTren(e))}</span><span class="min" style="color:${color(e.d)}">${e.d > 0 ? `+${e.d}′` : 'en hora'}</span></button></li>`).join('') || '<li class="vacio">Ningún tren en marcha coincide.</li>';
+  const vivos = trenesAhora(), cuenta = new Map();
+  for (const e of vivos) for (const est of new Set([e.s, e.dst].filter(Boolean))) if (norm(est).includes(q)) cuenta.set(est, (cuenta.get(est) ?? 0) + 1);
+  const estaciones = [...cuenta].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  resultados.innerHTML = estaciones.map(([est, n], i) => `<li><button data-est="${i}" class="est"><span class="q">Panel de ${escapa(est)}</span><span class="ruta">${n} ${n === 1 ? 'tren va' : 'trenes van'} hacia esta estación</span><span class="min">▤</span></button></li>`).join('') + encontrados.map((e, i) => `<li><button data-i="${i}"><span class="q">${escapa(nombreTren(e))}${e.k === 'c' ? ` · ${escapa(e.num)}` : ''}</span><span class="ruta">${escapa(rutaTren(e))}</span><span class="min" style="color:${color(e.d)}">${e.d > 0 ? `+${e.d}′` : 'en hora'}</span></button></li>`).join('') || '<li class="vacio">Ningún tren en marcha coincide.</li>';
   resultados.hidden = false;
-  resultados.querySelectorAll('button').forEach(b => b.onclick = () => { irA(encontrados[+b.dataset.i]); resultados.hidden = true; busca.blur(); });
+  resultados.querySelectorAll('button[data-i]').forEach(b => b.onclick = () => { irA(encontrados[+b.dataset.i]); resultados.hidden = true; busca.blur(); });
+  resultados.querySelectorAll('button[data-est]').forEach(b => b.onclick = () => { abrirPanel(estaciones[+b.dataset.est][0]); resultados.hidden = true; busca.blur(); });
 }
 busca.addEventListener('input', buscar);
 busca.addEventListener('keydown', ev => { if (ev.key === 'Enter') resultados.querySelector('button')?.click(); if (ev.key === 'Escape') { busca.value = ''; resultados.hidden = true; } });
@@ -578,6 +597,9 @@ medir(); vista = encuadre(ZONAS[0][1]); sEsp = vista.s;
 new ResizeObserver(() => { const z = vista.s / sEsp; medir(); sEsp = encuadre(ZONAS[0][1]).s; vista = { ...vista, s: sEsp * z }; }).observe(caja);
 requestAnimationFrame(dibujar);
 await pedir();
+// enlace directo a un panel: ?estacion=Valladolid
+const pedida = new URLSearchParams(location.search).get('estacion');
+if (pedida) { const q = norm(pedida); const est = trenesAhora().flatMap(e => [e.s, e.dst]).find(x => x && norm(x).includes(q)); if (est) abrirPanel(est); }
 const modoDeEnlace = () => ({ '#repeticion': 'moviola', '#prevision': 'prevision' })[location.hash] ?? 'vivo';
 if (modoDeEnlace() !== 'vivo') cambiarModo(modoDeEnlace());
 addEventListener('hashchange', () => cambiarModo(modoDeEnlace()));
