@@ -88,7 +88,7 @@
     <p>Esto de arriba es la materia prima: dónde está cada tren y cuánto retraso lleva. Cada 5 minutos se guarda una foto de toda la red en <a href="https://github.com/carlosgalan01/puntualmente" target="_blank" rel="noopener">la caja negra del proyecto</a>. Con unas semanas grabadas, encima van tres piezas.</p>
     <div class="pasos">
       <div class="paso"><span class="estado on">● Versión 0 en marcha</span><h3>Predecir el retraso a la llegada</h3><p>Un modelo aprende cómo se comporta cada línea según la hora, el día y el retraso que ya lleva el tren, y estima con cuánto llegará a destino.</p></div>
-      <div class="paso"><span class="estado prox">Por entrenar</span><h3>Avisar antes que el aviso oficial</h3><p>Cuando una línea empieza a ir peor de lo normal para esa hora, se marca como posible incidencia, siempre separada de los avisos que publica Renfe.</p></div>
+      <div class="paso"><span class="estado on">● Versión 0 en marcha</span><h3>Avisar antes que el aviso oficial</h3><p>Ya marca en rojo las líneas que van mucho peor que el resto de la red en este momento, y dice si Renfe ya ha avisado o no. Con semanas grabadas, comparará cada línea con lo que es normal para ella a esa hora.</p></div>
       <div class="paso"><span class="estado ya">Ya en la web</span><h3>La moviola del día</h3><p>Pasar un día entero en un minuto para ver cómo un retraso se contagia de un tren a los que vienen detrás.</p></div>
     </div>
   </section>
@@ -288,6 +288,18 @@ function dibujar(ahora) {
     if (e.k === 'l') { ctx.strokeStyle = C.texto; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.arc(x, y, r + 2.2, 0, 7); ctx.stroke(); }
   }
   ctx.globalAlpha = 1;
+  for (const f of anomalas) {
+    const ps = f.l.map(e => posicionDe(e.id)).filter(Boolean); if (!ps.length) continue;
+    const mx = ps.reduce((a, p) => a + p[0], 0) / ps.length, my = ps.reduce((a, p) => a + p[1], 0) / ps.length;
+    const x = sx(mx), y = sy(my), r = Math.max(...ps.map(p => Math.hypot(sx(p[0]) - x, sy(p[1]) - y))) + 16;
+    if (fuera(x, y)) continue;
+    const k = (ahora / 1400) % 1;
+    ctx.strokeStyle = C.rojo; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]); ctx.globalAlpha = .9;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.globalAlpha = (1 - k) * .6; ctx.beginPath(); ctx.arc(x, y, r + k * 26, 0, 7); ctx.stroke();
+    ctx.globalAlpha = 1; ctx.fillStyle = C.rojo; ctx.font = '600 12px "Barlow Condensed", sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(`POSIBLE INCIDENCIA · ${f.k.toUpperCase()}`, x, y - r - 8); ctx.textAlign = 'left';
+  }
   if (foco) {
     const f = puntos.find(p => p[0].id === foco);
     if (f) { const k = (ahora / 900) % 1; ctx.strokeStyle = C.texto; ctx.lineWidth = 2; ctx.globalAlpha = 1 - k; ctx.beginPath(); ctx.arc(f[1], f[2], 8 + k * 22, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
@@ -300,7 +312,7 @@ const hora = t => new Date(t * 1000).toLocaleTimeString('es-ES', { timeZone: 'Eu
 const TRAMOS = [['En hora', 0, 2], ['3–5 min', 3, 5], ['6–15 min', 6, 15], ['16–30', 16, 30], ['Más de 30', 31, 1e9]];
 const nombreTren = e => e.k === 'l' ? `${e.n} ${e.num}` : `${e.n} ${e.z || 'Cercanías'}`;
 // ---- el modelo: red neuronal entrenada con lo grabado (modelo/entrenar.py), ejecutada aquí mismo ----
-let MODELO = null;
+let MODELO = null, anomalas = [];
 fetch('/base/modelo.json').then(r => r.json()).then(m => { MODELO = m; tarjetaModelo(); }).catch(() => {});
 const kmEntre = (a, b) => { const dy = (a[0] - b[0]) * 111, dx = (a[1] - b[1]) * 111 * Math.cos(a[0] * Math.PI / 180); return Math.hypot(dx, dy); };
 function predecir(e) {
@@ -375,12 +387,24 @@ function problema() {
     if (e.k !== 'c' || !e.z) continue;
     const k = `${e.n} ${e.z}`; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(e);
   }
-  const filas = [...grupos].filter(([, l]) => l.length >= 2)
-    .map(([k, l]) => ({ k, l, media: l.reduce((s, e) => s + e.d, 0) / l.length }))
-    .sort((a, b) => b.media - a.media).slice(0, 8);
+  const todas = [...grupos].filter(([, l]) => l.length >= 2)
+    .map(([k, l]) => ({ k, l, n: l[0].n, z: l[0].z, media: l.reduce((s, e) => s + e.d, 0) / l.length, graves: l.filter(e => e.d > 15).length }));
+  // detector de anomalías: una línea es rara si su retraso medio se sale mucho de lo que hacen las demás líneas ahora mismo
+  // (puntuación robusta: distancia a la mediana en unidades de desviación absoluta mediana)
+  const medias = todas.map(f => f.media).sort((a, b) => a - b), mediana = medias[medias.length >> 1] ?? 0;
+  const mad = [...medias.map(m => Math.abs(m - mediana))].sort((a, b) => a - b)[medias.length >> 1] || 1;
+  for (const f of todas) {
+    f.rareza = (f.media - mediana) / (1.4826 * mad);
+    f.anomala = f.rareza > 5 && f.media > 15 && f.graves >= 2;
+    f.avisada = avisos.some(a => a.desde > Date.now() / 1000 - 86400 && a.zonas.includes(f.z) && a.lineas.includes(f.n));
+  }
+  // como mucho las tres más raras, para que el aviso signifique algo
+  todas.filter(f => f.anomala).sort((a, b) => b.rareza - a.rareza).slice(3).forEach(f => { f.anomala = false; });
+  anomalas = todas.filter(f => f.anomala);
+  const filas = todas.sort((a, b) => b.media - a.media).slice(0, 8);
   const max = Math.max(...filas.map(f => f.media), 10);
   const ol = document.getElementById('lineas');
-  ol.innerHTML = filas.map((f, i) => `<li><button data-i="${i}"><span class="q">${escapa(f.k)}</span><span class="b"><i style="width:${f.media / max * 100}%;background:${color(f.media)}"></i></span><span class="min" style="color:${color(f.media)}">+${Math.round(f.media)}′</span><span class="ruta">${f.l.length} trenes en marcha</span></button></li>`).join('') || '<li class="vacio">Esperando datos…</li>';
+  ol.innerHTML = filas.map((f, i) => `<li${f.anomala ? ' class="anomala"' : ''}><button data-i="${i}"><span class="q">${escapa(f.k)}</span><span class="b"><i style="width:${f.media / max * 100}%;background:${color(f.media)}"></i></span><span class="min" style="color:${color(f.media)}">+${Math.round(f.media)}′</span><span class="ruta">${f.l.length} trenes en marcha${f.graves ? ` · ${f.graves} con más de 15 min` : ''}${f.anomala ? ` <span class="alerta">● Posible incidencia${f.avisada ? ' · Renfe ya avisa' : ' · sin aviso oficial'}</span>` : ''}</span></button></li>`).join('') || '<li class="vacio">Esperando datos…</li>';
   ol.querySelectorAll('button').forEach(b => b.onclick = () => {
     const l = filas[+b.dataset.i].l, ps = l.map(e => posicionDe(e.id)).filter(Boolean);
     const xs = ps.map(p => p[0]), ys = ps.map(p => p[1]);

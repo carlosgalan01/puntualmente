@@ -150,3 +150,5 @@ body { margin: 0; }
 .modelo-ia .version { font: 11.5px var(--dato); }
 .cifras.modelo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 @media (max-width: 860px) { .modelo-ia { grid-template-columns: minmax(0, 1fr); } }
+.lineas li.anomala .q { color: var(--rojo); }
+.alerta { color: var(--rojo); font-weight: 600; }
