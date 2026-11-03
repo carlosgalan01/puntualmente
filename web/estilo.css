@@ -207,3 +207,7 @@ body { margin: 0; }
 .mini svg { display: block; height: 40px; }
 .mini span, .mini-vacia { font: 11px var(--dato); color: var(--tenue); }
 .mini-vacia { margin-top: 4px; max-width: 220px; }
+.lado-modelo { display: grid; gap: 20px; min-width: 0; }
+.importancia h3 { font: 600 13px var(--rotulo); letter-spacing: .12em; text-transform: uppercase; color: var(--tenue); margin: 0 0 4px; }
+.importancia p { font-size: 12.5px; margin: 0 0 8px; }
+.barra.imp { grid-template-columns: 170px 1fr 48px; font-family: var(--cuerpo); font-size: 12.5px; }

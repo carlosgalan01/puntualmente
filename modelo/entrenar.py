@@ -122,12 +122,26 @@ def main():
     cambia = np.abs(y[prueba]) >= 2
     print(f"error medio: red {mae_red:.2f} min · seguirá igual {mae_igual:.2f} min")
 
+    # qué mira la red: cuánto empeora el error si se barajan los valores de cada grupo de rasgos (importancia por permutación)
+    grupos_rasgos = {"Retraso que lleva ahora": ["retraso_ahora"], "Cómo ha cambiado hace poco": ["cambio_reciente", "hay_foto_anterior"],
+                     "Velocidad": ["velocidad_kmh"], "Hora del día": ["hora_sen", "hora_cos"],
+                     "Zona": [n for n in NOMBRES if n.startswith("zona_")], "Tipo de tren": ["es_larga_distancia"] + [n for n in NOMBRES if n.startswith("producto_")]}
+    rng = np.random.default_rng(7); Xp = X[prueba]; importancia = {}
+    for nombre, cols in grupos_rasgos.items():
+        idx = [NOMBRES.index(c) for c in cols]; subidas = []
+        for _ in range(5):
+            Xb = Xp.copy(); orden = rng.permutation(len(Xb)); Xb[:, idx] = Xb[orden][:, idx]
+            subidas.append(np.mean(np.abs(confianza * red.predict(escala.transform(Xb)) - y[prueba])) - mae_red)
+        importancia[nombre] = round(float(max(0.0, np.mean(subidas))), 3)
+    print("importancia:", importancia)
+
     json.dump({
         "version": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "horizonte_min": a.horizonte, "confianza": confianza, "tendencia_min": a.tendencia,
         "rasgos": NOMBRES, "zonas": ZONAS, "productos": PRODUCTOS,
         "media": escala.mean_.round(5).tolist(), "escala": escala.scale_.round(5).tolist(),
         "capas": [{"w": w.round(5).tolist(), "b": b.round(5).tolist()} for w, b in zip(red.coefs_, red.intercepts_)],
+        "importancia": importancia,
         "evaluacion": {
             "fotos": len(fotos), "ejemplos": int(len(y)), "trenes": int(len(set(grupos))), "ejemplos_prueba": int(len(prueba)),
             "error_red_min": round(mae_red, 2), "error_seguira_igual_min": round(mae_igual, 2),

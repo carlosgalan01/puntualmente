@@ -88,7 +88,10 @@
       <p class="nota">Esta versión 0 se ha entrenado con sólo 10 minutos de datos, y en general todavía no gana a «seguirá igual»: casi ningún retraso cambia en 5 minutos. Cuando el retraso sí cambia, se equivoca algo menos. Cada noche se reentrena con todo lo grabado, a 30 minutos vista.</p>
       <p class="version" id="modeloVersion"></p>
     </div>
-    <div class="cifras modelo" id="modelo"></div>
+    <div class="lado-modelo">
+      <div class="cifras modelo" id="modelo"></div>
+      <div class="importancia"><h3>Qué mira la red</h3><p>Cuánto empeora su error si le desordenamos cada dato. Cuanto más larga la barra, más se apoya en él.</p><div class="barras" id="importancia"></div></div>
+    </div>
   </section>
 
   <section class="familias">
@@ -384,6 +387,8 @@ function tarjetaModelo() {
     <div class="cifra"><b>${ev.error_red_min.toString().replace('.', ',')} min</b><span>error medio de la red</span></div>
     <div class="cifra"><b>${ev.error_seguira_igual_min.toString().replace('.', ',')} min</b><span>error de «seguirá igual»</span></div>
     <div class="cifra"><b>${ev.error_red_cuando_cambia?.toString().replace('.', ',')} / ${ev.error_igual_cuando_cambia?.toString().replace('.', ',')}</b><span>red / «igual» cuando el retraso cambia (${ev.porcentaje_que_cambia.toString().replace('.', ',')} % de los casos)</span></div>`;
+  const imp = Object.entries(MODELO.importancia ?? {}).sort((a, b) => b[1] - a[1]), tope = Math.max(...imp.map(i => i[1]), .01);
+  document.getElementById('importancia').innerHTML = imp.map(([n, v]) => `<div class="barra imp"><span>${escapa(n)}</span><span class="b"><i style="width:${v / tope * 100}%;background:${C.ambar}"></i></span><span class="n">+${v.toFixed(2).replace('.', ',')}′</span></div>`).join('');
   document.getElementById('modeloVersion').textContent = `Versión del ${MODELO.version} · horizonte ${MODELO.horizonte_min} min · ${ev.fotos} fotos de la red`;
 }
 // ---- familias de líneas (modelo/agrupar.py) ----
