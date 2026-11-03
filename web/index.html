@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Andén</title>
+<meta name="description" content="Todos los trenes de Renfe que circulan ahora mismo, en el mapa con su retraso real.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a111d'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%236fd3bd'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+<div class="marco">
+  <header>
+    <div>
+      <div class="ceja">Prototipo · TFM del Máster en Inteligencia Artificial</div>
+      <h1>Andén</h1>
+      <p class="entradilla">Todos los trenes de Renfe que circulan <b>ahora mismo</b>, en el mapa con su retraso real. Se actualiza solo cada 15 segundos con los datos abiertos de Renfe.</p>
+    </div>
+    <div class="sello"><span><span class="rec"></span>En directo</span><strong id="tramo">Conectando…</strong><span id="cuantos">—</span></div>
+  </header>
+
+  <section class="cuadro">
+    <div class="mapa" id="mapa">
+      <canvas id="lienzo" aria-label="Mapa de España con los trenes en circulación coloreados según su retraso"></canvas>
+      <div class="zonas" id="zonas" role="group" aria-label="Zona del mapa"></div>
+      <div class="zoom"><button id="mas" aria-label="Acercar">+</button><button id="menos" aria-label="Alejar">−</button></div>
+      <div class="leyenda">
+        <span><i style="background:var(--puntual)"></i>En hora</span><span><i style="background:var(--leve)"></i>3–5 min</span><span><i style="background:var(--ambar)"></i>6–15 min</span><span><i style="background:var(--rojo)"></i>Más de 15</span><span>◯ larga y media distancia</span>
+      </div>
+      <div class="mando"><span class="estado-vivo" id="vivo">Pidiendo los datos a Renfe…</span></div>
+      <div class="ficha" id="ficha" hidden></div>
+    </div>
+
+    <aside>
+      <div class="bloque">
+        <h2>En este momento</h2>
+        <div class="cifras">
+          <div class="cifra"><b id="kTotal">—</b><span>trenes en marcha</span></div>
+          <div class="cifra"><b id="kHora">—</b><span>van en hora (5 min o menos)</span></div>
+          <div class="cifra"><b id="kMal">—</b><span>llevan más de 15 min</span></div>
+        </div>
+        <div class="barras" id="barras"></div>
+      </div>
+      <div class="bloque">
+        <h2>Los que más tarde van</h2>
+        <ol class="peores" id="peores"></ol>
+        <p class="pista">Pulsa uno para ir a buscarlo en el mapa.</p>
+      </div>
+    </aside>
+  </section>
+
+  <section class="ia">
+    <h2>Lo que la IA va a hacer con esto</h2>
+    <p>Esto de arriba es la materia prima: dónde está cada tren y cuánto retraso lleva. Cada 5 minutos se guarda una foto de toda la red en <a href="https://github.com/carlosgalan01/puntualmente" target="_blank" rel="noopener">la caja negra del proyecto</a>. Con unas semanas grabadas, encima van tres piezas.</p>
+    <div class="pasos">
+      <div class="paso"><span class="estado on">● Grabando desde el 3/11</span><h3>Predecir el retraso a la llegada</h3><p>Un modelo aprende cómo se comporta cada línea según la hora, el día y el retraso que ya lleva el tren, y estima con cuánto llegará a destino.</p></div>
+      <div class="paso"><span class="estado prox">Por entrenar</span><h3>Avisar antes que el aviso oficial</h3><p>Cuando una línea empieza a ir peor de lo normal para esa hora, se marca como posible incidencia, siempre separada de los avisos que publica Renfe.</p></div>
+      <div class="paso"><span class="estado prox">Próximamente</span><h3>La moviola del día</h3><p>Pasar un día entero en un minuto para ver cómo un retraso se contagia de un tren a los que vienen detrás.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Datos abiertos de Renfe: posiciones y retrasos de Cercanías (gtfsrt.renfe.com), visor de larga distancia y horarios GTFS. Contorno de países: Natural Earth.</span>
+    <span>Prototipo académico. No es una herramienta de Renfe ni está relacionado con la compañía.</span>
+  </footer>
+</div>
+
+<script>
+(async () => {
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C = { tierra: css('--tierra'), costa: css('--costa'), via: css('--via'), linea: css('--linea'), panel: css('--panel'), texto: css('--texto'),
+  puntual: css('--puntual'), leve: css('--leve'), ambar: css('--ambar'), rojo: css('--rojo') };
+const color = d => d <= 2 ? C.puntual : d <= 5 ? C.leve : d <= 15 ? C.ambar : C.rojo;
+const K = Math.cos(40 * Math.PI / 180), X = lon => lon * K, Y = lat => -lat;
+const CADA = 15000;
+const sinMovimiento = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---- mapa base ----
+const GEO = await fetch('/base/geo.json').then(r => r.json());
+const pEsp = new Path2D(), pOtros = new Path2D(), pRed = new Path2D(), pCer = new Path2D();
+for (const [n, anillos] of Object.entries(GEO.paises)) {
+  const p = n === 'Spain' ? pEsp : pOtros;
+  for (const r of anillos) { r.forEach(([lo, la], i) => i ? p.lineTo(X(lo), Y(la)) : p.moveTo(X(lo), Y(la))); p.closePath(); }
+}
+for (const [a, b, c, d] of GEO.red) { pRed.moveTo(X(a), Y(b)); pRed.lineTo(X(c), Y(d)); }
+for (const l of GEO.lineas) l.p.forEach(([lo, la], i) => i ? pCer.lineTo(X(lo), Y(la)) : pCer.moveTo(X(lo), Y(la)));
+
+// ---- trenes en directo: cada uno se desliza de su posición anterior a la nueva ----
+const trenes = new Map();
+const avance = (e, ahora) => sinMovimiento ? 1 : Math.min(1, (ahora - e.t0) / CADA);
+const pos = (e, ahora) => { const u = avance(e, ahora); return [e.de[0] + (e.a[0] - e.de[0]) * u, e.de[1] + (e.a[1] - e.de[1]) * u]; };
+const alfa = (e, ahora) => e.al0 + (e.al1 - e.al0) * Math.min(1, avance(e, ahora) * 3);
+let ultimaFoto = 0, fallos = 0;
+function aplicar(j) {
+  const ahora = performance.now(), vistos = new Set();
+  for (const t of j.trenes) {
+    vistos.add(t.id);
+    const nuevo = [X(t.lon), Y(t.lat)];
+    let e = trenes.get(t.id);
+    if (!e) { trenes.set(t.id, { ...t, de: nuevo, a: nuevo, t0: ahora, al0: 0, al1: 1, rastro: [] }); continue; }
+    const p = pos(e, ahora), salto = Math.hypot(nuevo[0] - p[0], nuevo[1] - p[1]) > .4;
+    if (!salto) { e.rastro.push(p); if (e.rastro.length > 8) e.rastro.shift(); } else e.rastro = [];
+    Object.assign(e, t, { de: salto ? nuevo : p, a: nuevo, t0: ahora, al0: alfa(e, ahora), al1: 1, fuera: false });
+  }
+  for (const [id, e] of trenes) {
+    if (vistos.has(id)) continue;
+    if (e.fuera) { trenes.delete(id); continue; }
+    const p = pos(e, ahora);
+    Object.assign(e, { de: p, a: p, t0: ahora, al0: alfa(e, ahora), al1: 0, fuera: true });
+  }
+  ultimaFoto = j.t;
+}
+async function pedir() {
+  try {
+    const r = await fetch('/api/trenes', { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    aplicar(await r.json()); fallos = 0;
+  } catch { fallos++; }
+  pintarEstado(); panel();
+}
+
+// ---- lienzo y vista ----
+const lienzo = document.getElementById('lienzo'), ctx = lienzo.getContext('2d'), caja = document.getElementById('mapa');
+let W = 0, H = 0, dpr = 1;
+function medir() { const r = caja.getBoundingClientRect(); W = r.width; H = r.height; dpr = Math.min(2, window.devicePixelRatio || 1); lienzo.width = W * dpr; lienzo.height = H * dpr; }
+const ZONAS = [
+  ['España', [-9.4, 35.9, 3.4, 43.9]], ['Madrid', [-4.15, 40.2, -3.3, 40.72]], ['Barcelona', [1.55, 41.2, 2.6, 41.85]],
+  ['Valencia', [-0.85, 39.15, -0.05, 39.8]], ['Sevilla', [-6.3, 37.15, -5.55, 37.6]], ['Bilbao', [-3.25, 43.12, -2.65, 43.45]],
+  ['Asturias', [-6.25, 43.2, -5.45, 43.62]], ['Málaga', [-4.75, 36.48, -4.25, 36.8]]
+];
+function encuadre([lo0, la0, lo1, la1]) {
+  const s = Math.min(W / (X(lo1) - X(lo0)), (H - 70) / (la1 - la0)) * .94;
+  return { cx: (X(lo0) + X(lo1)) / 2, cy: (Y(la0) + Y(la1)) / 2 + 20 / s, s };
+}
+let vista, viaje = null, sEsp = 1, foco = null, puntos = [];
+function volar(dest, ms = 1100) { if (sinMovimiento) { vista = dest; return; } viaje = { de: { ...vista }, a: dest, t0: performance.now(), ms }; }
+const suave = u => u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+
+function dibujar(ahora) {
+  if (viaje) {
+    const u = Math.min(1, (ahora - viaje.t0) / viaje.ms), e = suave(u), { de, a } = viaje;
+    vista = { cx: de.cx + (a.cx - de.cx) * e, cy: de.cy + (a.cy - de.cy) * e, s: Math.exp(Math.log(de.s) + (Math.log(a.s) - Math.log(de.s)) * e) };
+    if (u >= 1) viaje = null;
+  }
+  const { cx, cy, s } = vista, z = s / sEsp;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = C.panel; ctx.fillRect(0, 0, W, H);
+  ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * (W / 2 - cx * s), dpr * (H / 2 - cy * s));
+  ctx.fillStyle = C.tierra; ctx.globalAlpha = .55; ctx.fill(pOtros); ctx.globalAlpha = 1; ctx.fill(pEsp);
+  ctx.strokeStyle = C.costa; ctx.lineWidth = 1 / s; ctx.stroke(pOtros); ctx.stroke(pEsp);
+  ctx.strokeStyle = C.via; ctx.lineWidth = Math.min(1.6, .9 + z * .05) / s; ctx.stroke(pRed);
+  ctx.strokeStyle = C.linea; ctx.lineWidth = Math.min(2.4, .8 + z * .08) / s; ctx.stroke(pCer);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const sx = x => W / 2 + (x - cx) * s, sy = y => H / 2 + (y - cy) * s;
+  const r0 = Math.max(2, Math.min(6.5, 2 + Math.log2(z) * .9));
+  const fuera = (x, y) => x < -20 || y < -20 || x > W + 20 || y > H + 20;
+  puntos = [];
+  ctx.globalCompositeOperation = 'lighter';
+  for (const e of trenes.values()) {
+    const [wx, wy] = pos(e, ahora), a = alfa(e, ahora); if (a <= 0.01) continue;
+    const x = sx(wx), y = sy(wy); puntos.push([e, x, y, a]);
+    if (fuera(x, y)) continue;
+    const col = color(e.d);
+    ctx.globalAlpha = a * .22; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r0 * 2.6, 0, 7); ctx.fill();
+    if (e.rastro.length && z > 1.5) {
+      ctx.globalAlpha = a * .35; ctx.strokeStyle = col; ctx.lineWidth = r0 * .7; ctx.beginPath();
+      e.rastro.forEach(([px, py], i) => i ? ctx.lineTo(sx(px), sy(py)) : ctx.moveTo(sx(px), sy(py))); ctx.lineTo(x, y); ctx.stroke();
+    }
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  for (const [e, x, y, a] of puntos) {
+    if (fuera(x, y)) continue;
+    ctx.globalAlpha = a; ctx.fillStyle = color(e.d);
+    const r = e.k === 'l' ? r0 * 1.15 : r0 * .85;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    if (e.k === 'l') { ctx.strokeStyle = C.texto; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.arc(x, y, r + 2.2, 0, 7); ctx.stroke(); }
+  }
+  ctx.globalAlpha = 1;
+  if (foco) {
+    const f = puntos.find(p => p[0].id === foco);
+    if (f) { const k = (ahora / 900) % 1; ctx.strokeStyle = C.texto; ctx.lineWidth = 2; ctx.globalAlpha = 1 - k; ctx.beginPath(); ctx.arc(f[1], f[2], 8 + k * 22, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
+  }
+  requestAnimationFrame(dibujar);
+}
+
+// ---- panel ----
+const hora = t => new Date(t * 1000).toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid' });
+const TRAMOS = [['En hora', 0, 2], ['3–5 min', 3, 5], ['6–15 min', 6, 15], ['16–30', 16, 30], ['Más de 30', 31, 1e9]];
+const nombreTren = e => e.k === 'l' ? `${e.n} ${e.num}` : `Cercanías ${e.n}`;
+const rutaTren = e => e.k === 'l' ? `${e.o} → ${e.dst}` : (e.s ? `hacia ${e.s}` : `tren ${e.num}`);
+const escapa = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function pintarEstado() {
+  const v = document.getElementById('vivo');
+  if (fallos && !ultimaFoto) { v.className = 'estado-vivo error'; v.innerHTML = '<b>Renfe no responde ahora mismo.</b> Lo vuelvo a intentar en 15 segundos.'; return; }
+  const hace = Math.max(0, Math.round(Date.now() / 1000 - ultimaFoto));
+  v.className = 'estado-vivo' + (fallos > 1 ? ' error' : '');
+  v.innerHTML = `<b>${hora(ultimaFoto)}</b> datos de hace ${hace} s · se actualiza cada 15 s${fallos > 1 ? ' · <b>sin respuesta de Renfe</b>' : ''}`;
+  document.getElementById('tramo').textContent = hora(ultimaFoto);
+}
+function panel() {
+  const vivos = [...trenes.values()].filter(e => !e.fuera);
+  const n = vivos.length || 1;
+  document.getElementById('cuantos').textContent = `${vivos.length} trenes en el mapa`;
+  document.getElementById('kTotal').textContent = vivos.length;
+  document.getElementById('kHora').textContent = Math.round(vivos.filter(e => e.d <= 5).length / n * 100) + '%';
+  document.getElementById('kMal').textContent = vivos.filter(e => e.d > 15).length;
+  const cuenta = TRAMOS.map(([, a, b]) => vivos.filter(e => e.d >= a && e.d <= b).length), max = Math.max(...cuenta, 1);
+  document.getElementById('barras').innerHTML = TRAMOS.map(([et, a], i) =>
+    `<div class="barra"><span>${et}</span><span class="b"><i style="width:${cuenta[i] / max * 100}%;background:${color(a)}"></i></span><span class="n">${cuenta[i]}</span></div>`).join('');
+  const peores = vivos.slice().sort((a, b) => b.d - a.d).slice(0, 7);
+  const ol = document.getElementById('peores');
+  ol.innerHTML = peores.map((e, i) => `<li><button data-i="${i}"><span class="q">${escapa(nombreTren(e))}</span><span class="ruta">${escapa(rutaTren(e))}</span><span class="min" style="color:${color(e.d)}">+${e.d}′</span></button></li>`).join('');
+  ol.querySelectorAll('button').forEach(b => b.onclick = () => irA(peores[+b.dataset.i]));
+}
+function irA(e) { foco = e.id; marcar(null); const [x, y] = pos(e, performance.now()); volar({ cx: x, cy: y, s: Math.max(vista.s, sEsp * 9) }); }
+
+// ---- controles ----
+const zonas = document.getElementById('zonas');
+function marcar(nombre) { zonas.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.textContent === nombre)); }
+for (const [nombre, c4] of ZONAS) {
+  const b = document.createElement('button'); b.textContent = nombre; b.setAttribute('aria-pressed', nombre === 'España');
+  b.onclick = () => { foco = null; marcar(nombre); volar(encuadre(c4)); };
+  zonas.appendChild(b);
+}
+document.getElementById('mas').onclick = () => { marcar(null); volar({ ...vista, s: vista.s * 1.8 }, 450); };
+document.getElementById('menos').onclick = () => { marcar(null); volar({ ...vista, s: Math.max(sEsp * .8, vista.s / 1.8) }, 450); };
+let agarre = null;
+lienzo.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') return; agarre = { x: e.clientX, y: e.clientY, cx: vista.cx, cy: vista.cy }; lienzo.classList.add('arrastra'); lienzo.setPointerCapture(e.pointerId); });
+lienzo.addEventListener('pointerup', () => { agarre = null; lienzo.classList.remove('arrastra'); });
+const ficha = document.getElementById('ficha');
+lienzo.addEventListener('pointermove', ev => {
+  const r = lienzo.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
+  if (agarre) { viaje = null; marcar(null); vista = { ...vista, cx: agarre.cx - (ev.clientX - agarre.x) / vista.s, cy: agarre.cy - (ev.clientY - agarre.y) / vista.s }; ficha.hidden = true; return; }
+  let mejor = null, dm = 144;
+  for (const p of puntos) { const d = (p[1] - mx) ** 2 + (p[2] - my) ** 2; if (d < dm) { dm = d; mejor = p; } }
+  if (!mejor) { ficha.hidden = true; return; }
+  const e = mejor[0];
+  ficha.innerHTML = `<div class="t">${escapa(nombreTren(e))}${e.k === 'c' ? ` · tren ${escapa(e.num)}` : ''}</div><div class="s">${e.k === 'l' ? escapa(`${e.o} → ${e.dst}`) : 'Cercanías'}</div>${e.s ? `<div class="s">Siguiente: ${escapa(e.s)}</div>` : ''}<div class="r" style="color:${color(e.d)}">${e.d <= 0 ? 'En hora' : `+${e.d} min de retraso`}</div>`;
+  ficha.hidden = false;
+  ficha.style.left = Math.min(mx + 14, W - 250) + 'px'; ficha.style.top = Math.max(8, my - 70) + 'px';
+});
+lienzo.addEventListener('pointerleave', () => { ficha.hidden = true; });
+
+// ---- arranque ----
+medir(); vista = encuadre(ZONAS[0][1]); sEsp = vista.s;
+new ResizeObserver(() => { const z = vista.s / sEsp; medir(); sEsp = encuadre(ZONAS[0][1]).s; vista = { ...vista, s: sEsp * z }; }).observe(caja);
+requestAnimationFrame(dibujar);
+await pedir();
+setInterval(pedir, CADA);
+setInterval(pintarEstado, 1000);
+})();
+</script>
+</body>
+</html>

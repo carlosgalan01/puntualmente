@@ -1,0 +1,91 @@
+
+/* Sala de control de noche: el mapa manda, todo lo demás es instrumental a su lado. Un solo aspecto oscuro, elegido a propósito. */
+:root {
+  --noche: #0a111d; --panel: #0f1828; --tierra: #18263d; --costa: #33476a; --via: #2b3c5a; --linea: #3a5072;
+  --texto: #e7ecf3; --tenue: #8a97ae; --raya: #1d2a40;
+  --puntual: #6fd3bd; --leve: #d9dd7a; --ambar: #f2a93b; --rojo: #f05a4a;
+  --display: "Big Shoulders Display", "Arial Narrow", sans-serif;
+  --cuerpo: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  --rotulo: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --dato: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { background: var(--noche); color: var(--texto); }
+body { font-family: var(--cuerpo); font-size: 15px; line-height: 1.5; }
+.marco { max-width: 1320px; margin: 0 auto; padding-block: 28px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 22px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 32px; }
+.ceja { font-family: var(--rotulo); font-weight: 600; letter-spacing: .14em; text-transform: uppercase; font-size: 12.5px; color: var(--ambar); }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(54px, 9vw, 96px); line-height: .86; margin: 6px 0 0; letter-spacing: .01em; }
+.entradilla { max-width: 56ch; color: var(--tenue); margin: 10px 0 0; font-size: 16px; text-wrap: pretty; }
+.entradilla b { color: var(--texto); font-weight: 600; }
+.sello { font-family: var(--dato); font-size: 12px; color: var(--tenue); border: 1px solid var(--raya); padding: 8px 12px; border-radius: 4px; display: grid; gap: 2px; }
+.sello strong { color: var(--texto); font-weight: 600; font-size: 13px; }
+.rec { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--rojo); margin-right: 6px; vertical-align: 1px; animation: rec 1.6s infinite; }
+@keyframes rec { 50% { opacity: .25; } }
+
+.cuadro { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+.mapa { position: relative; background: var(--panel); border: 1px solid var(--raya); border-radius: 6px; overflow: hidden; aspect-ratio: 1.38; max-width: 100%; }
+canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+canvas.arrastra { cursor: grabbing; }
+.zonas { position: absolute; top: 12px; left: 12px; right: 60px; display: flex; flex-wrap: wrap; gap: 6px; }
+.zonas button, .zoom button, .play { font-family: var(--rotulo); font-weight: 600; font-size: 13px; letter-spacing: .04em; color: var(--texto); background: color-mix(in srgb, var(--noche) 78%, transparent); border: 1px solid var(--via); border-radius: 3px; padding: 4px 10px; cursor: pointer; }
+.zonas button[aria-pressed="true"] { background: var(--texto); color: var(--noche); border-color: var(--texto); }
+.zonas button:hover, .zoom button:hover { border-color: var(--tenue); }
+.zoom { position: absolute; top: 12px; right: 12px; display: grid; gap: 6px; }
+.zoom button { width: 32px; height: 32px; padding: 0; font-size: 18px; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--ambar); outline-offset: 2px; }
+.leyenda { position: absolute; left: 12px; bottom: 58px; display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--rotulo); font-size: 13px; color: var(--tenue); background: color-mix(in srgb, var(--noche) 70%, transparent); padding: 5px 9px; border-radius: 3px; }
+.leyenda i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
+.mando { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: linear-gradient(transparent, color-mix(in srgb, var(--noche) 92%, transparent) 40%); }
+.play { width: 34px; height: 30px; padding: 0; font-size: 14px; }
+.reloj { font-family: var(--dato); font-size: 14px; font-weight: 600; min-width: 7.5ch; font-variant-numeric: tabular-nums; }
+.vel { font-family: var(--dato); font-size: 11px; color: var(--tenue); }
+input[type=range] { flex: 1; min-width: 0; accent-color: var(--ambar); }
+.ficha { position: absolute; pointer-events: none; background: var(--noche); border: 1px solid var(--linea); border-radius: 4px; padding: 8px 10px; font-size: 13px; line-height: 1.35; max-width: 240px; box-shadow: 0 6px 20px rgb(0 0 0 / .4); }
+.ficha .t { font-family: var(--rotulo); font-weight: 600; font-size: 15px; }
+.ficha .r { font-family: var(--dato); font-weight: 600; margin-top: 3px; }
+.ficha .s { color: var(--tenue); }
+
+aside { display: grid; gap: 16px; min-width: 0; }
+.bloque { background: var(--panel); border: 1px solid var(--raya); border-radius: 6px; padding: 14px 16px; display: grid; gap: 10px; }
+.bloque h2 { font-family: var(--rotulo); font-weight: 600; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--tenue); margin: 0; }
+.cifras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cifra b { display: block; font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; }
+.cifra span { font-size: 12px; color: var(--tenue); line-height: 1.25; display: block; margin-top: 4px; }
+.barras { display: grid; gap: 5px; }
+.barra { display: grid; grid-template-columns: 76px 1fr 34px; align-items: center; gap: 8px; font-family: var(--dato); font-size: 11.5px; color: var(--tenue); }
+.barra .b { height: 10px; border-radius: 2px; background: var(--raya); position: relative; overflow: hidden; }
+.barra .b i { position: absolute; inset: 0 auto 0 0; border-radius: 2px; transition: width .3s; }
+.barra .n { text-align: right; color: var(--texto); font-variant-numeric: tabular-nums; }
+ol.peores { list-style: none; margin: 0; padding: 0; display: grid; }
+ol.peores li button { width: 100%; text-align: left; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 7px 0; border: 0; border-top: 1px solid var(--raya); background: none; color: var(--texto); cursor: pointer; font: inherit; }
+ol.peores li:first-child button { border-top: 0; }
+ol.peores li button:hover .q { color: var(--ambar); }
+.q { font-family: var(--rotulo); font-weight: 600; font-size: 15px; }
+.ruta { grid-column: 1; font-size: 12.5px; color: var(--tenue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.min { grid-row: 1 / 3; grid-column: 2; align-self: center; font-family: var(--dato); font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; }
+.pista { font-size: 12px; color: var(--tenue); margin: 0; }
+
+.ia { display: grid; gap: 14px; margin-top: 10px; }
+.ia > h2 { font-family: var(--display); font-weight: 800; font-size: clamp(30px, 4.4vw, 44px); line-height: 1; margin: 0; text-wrap: balance; }
+.ia > p { margin: 0; color: var(--tenue); max-width: 64ch; }
+.pasos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.paso { border-top: 2px solid var(--via); padding-top: 12px; display: grid; gap: 6px; align-content: start; }
+.paso h3 { font-family: var(--rotulo); font-weight: 600; font-size: 20px; margin: 0; line-height: 1.15; }
+.paso p { margin: 0; color: var(--tenue); font-size: 14.5px; }
+.estado { justify-self: start; font-family: var(--dato); font-size: 11px; padding: 2px 8px; border-radius: 10px; border: 1px solid currentColor; }
+.estado.on { color: var(--rojo); } .estado.prox { color: var(--tenue); } .estado.ya { color: var(--puntual); }
+footer { border-top: 1px solid var(--raya); padding-top: 14px; font-size: 12.5px; color: var(--tenue); display: grid; gap: 4px; }
+footer a { color: var(--texto); }
+
+@media (max-width: 960px) { .cuadro { grid-template-columns: minmax(0, 1fr); } aside { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); } .pasos { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 560px) { .mapa { aspect-ratio: .9; } .zonas { right: 52px; } .zonas button { font-size: 12px; padding: 3px 7px; } .leyenda { bottom: 54px; font-size: 12px; } }
+@media (prefers-reduced-motion: reduce) { .rec { animation: none; } }
+
+/* ---- web propia (fuera de claude.ai) ---- */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; }
+.mando .estado-vivo { font-family: var(--dato); font-size: 12px; color: var(--tenue); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mando .estado-vivo b { color: var(--texto); font-weight: 600; }
+.mando .estado-vivo.error b { color: var(--rojo); }
+.paso a, .entradilla a { color: var(--texto); }
