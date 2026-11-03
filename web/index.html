@@ -83,6 +83,16 @@
     <div class="cifras modelo" id="modelo"></div>
   </section>
 
+  <section class="familias">
+    <div class="texto">
+      <h2>Familias de líneas</h2>
+      <p>Un segundo modelo, sin etiquetas: agrupa las líneas de Cercanías según cómo se comportan (retraso medio, cuánto varía, cuántos trenes pasan de 15 minutos y si van a peor) con k-medias. Cada punto es una línea; arriba a la derecha, las que peor lo pasan.</p>
+      <ul class="leyenda-fam" id="famLeyenda"></ul>
+      <p class="version" id="famVersion"></p>
+    </div>
+    <div class="grafica" id="famGrafica" role="img" aria-label="Gráfica de dispersión de las líneas de Cercanías por retraso medio y porcentaje de trenes con más de 15 minutos"></div>
+  </section>
+
   <section class="ia">
     <h2>Lo que la IA va a hacer con esto</h2>
     <p>Esto de arriba es la materia prima: dónde está cada tren y cuánto retraso lleva. Cada 5 minutos se guarda una foto de toda la red en <a href="https://github.com/carlosgalan01/puntualmente" target="_blank" rel="noopener">la caja negra del proyecto</a>. Con unas semanas grabadas, encima van tres piezas.</p>
@@ -341,6 +351,24 @@ function tarjetaModelo() {
     <div class="cifra"><b>${ev.error_red_cuando_cambia?.toString().replace('.', ',')} / ${ev.error_igual_cuando_cambia?.toString().replace('.', ',')}</b><span>red / «igual» cuando el retraso cambia (${ev.porcentaje_que_cambia.toString().replace('.', ',')} % de los casos)</span></div>`;
   document.getElementById('modeloVersion').textContent = `Versión del ${MODELO.version} · horizonte ${MODELO.horizonte_min} min · ${ev.fotos} fotos de la red`;
 }
+// ---- familias de líneas (modelo/agrupar.py) ----
+fetch('/base/familias.json').then(r => r.json()).then(F => {
+  const cols = [C.puntual, C.leve, C.ambar, C.rojo];
+  document.getElementById('famLeyenda').innerHTML = F.familias.map(f => `<li><i style="background:${cols[f.rango]}"></i><b>${escapa(f.nombre)}</b> · ${f.lineas} ${f.lineas === 1 ? "línea" : "líneas"} · ${f.retraso_medio.toString().replace('.', ',')} min de media</li>`).join('');
+  document.getElementById('famVersion').textContent = `Versión del ${F.version} · ${F.fotos} fotos de la red`;
+  const W = 560, H = 340, m = { l: 46, r: 16, t: 14, b: 40 };
+  const xmax = Math.ceil(Math.max(...F.lineas.map(l => l.retraso_medio), 10) / 10) * 10;
+  const x = v => m.l + v / xmax * (W - m.l - m.r), y = v => H - m.b - v / 100 * (H - m.t - m.b);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+  for (let v = 0; v <= 100; v += 25) svg += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="${C.via}" stroke-width="1" opacity=".5"/><text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end" class="eje">${v} %</text>`;
+  for (let v = 0; v <= xmax; v += xmax / 5) svg += `<text x="${x(v)}" y="${H - m.b + 18}" text-anchor="middle" class="eje">${Math.round(v)}′</text>`;
+  svg += `<text x="${(W + m.l) / 2}" y="${H - 4}" text-anchor="middle" class="eje-t">retraso medio de la línea (minutos)</text>`;
+  svg += `<text transform="translate(12 ${(H - m.b) / 2}) rotate(-90)" text-anchor="middle" class="eje-t">trenes con más de 15 min</text>`;
+  for (const l of F.lineas) svg += `<circle cx="${x(l.retraso_medio)}" cy="${y(l.graves_pct)}" r="6" fill="${cols[l.familia]}" fill-opacity=".85" stroke="${C.panel}" stroke-width="1.5"><title>${escapa(l.linea)} · ${l.retraso_medio} min de media · ${l.graves_pct} % con más de 15 min</title></circle>`;
+  for (const l of F.lineas.filter(l => l.familia >= 2)) svg += `<text x="${x(l.retraso_medio) - 9}" y="${y(l.graves_pct) + 4}" text-anchor="end" class="etq">${escapa(l.linea)}</text>`;
+  document.getElementById('famGrafica').innerHTML = svg + '</svg>';
+}).catch(() => { document.querySelector('.familias')?.remove(); });
+
 const rutaTren = e => e.k === 'l' ? `${e.o} → ${e.dst}` : (e.s ? `próxima: ${e.s}` : `tren ${e.num}`);
 const escapa = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function pintarEstado() {
