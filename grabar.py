@@ -5,6 +5,13 @@ def leer(url):
     return json.load(urllib.request.urlopen(url, timeout=30))
 
 ahora = datetime.datetime.now(datetime.timezone.utc)
+# con --si-hace-falta no graba si ya hay una foto de hace menos de 4 minutos (la del grabador continuo)
+import sys
+hoy = pathlib.Path("datos") / f"{ahora:%Y-%m-%d}.csv"
+if "--si-hace-falta" in sys.argv and hoy.exists():
+    ultima = hoy.read_text().rstrip().rsplit("\n", 1)[-1].split(",")[0]
+    if ultima[:4].isdigit() and (ahora - datetime.datetime.fromisoformat(ultima.replace("Z", "+00:00"))).total_seconds() < 240:
+        print("ya hay una foto reciente; no hace falta otra"); sys.exit(0)
 filas = []
 pos = leer("https://gtfsrt.renfe.com/vehicle_positions.json")
 upd = leer("https://gtfsrt.renfe.com/trip_updates.json")

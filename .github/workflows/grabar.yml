@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 4
     steps:
       - uses: actions/checkout@v4
-      - run: mkdir -p datos && python3 grabar.py
+      - run: mkdir -p datos && python3 grabar.py --si-hace-falta
       - run: |
           git config user.name "grabador" && git config user.email "grabador@users.noreply.github.com"
           git add datos && git commit -qm "datos $(date -u +%FT%H:%M)" || exit 0

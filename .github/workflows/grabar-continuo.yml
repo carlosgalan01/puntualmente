@@ -1,0 +1,31 @@
+name: grabador continuo
+# Graba una foto cada 5 minutos durante casi 6 horas y, al acabar, se lanza a sí mismo otra vez.
+# Así la caja negra no depende del programador de GitHub, que a veces tarda horas en arrancar.
+on: workflow_dispatch
+permissions:
+  contents: write
+  actions: write
+concurrency: continuo
+jobs:
+  grabar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+      - name: grabar cada 5 minutos
+        run: |
+          git config user.name "grabador" && git config user.email "grabador@users.noreply.github.com"
+          mkdir -p datos
+          fin=$(( $(date +%s) + 345 * 60 ))
+          while [ "$(date +%s)" -lt "$fin" ]; do
+            python3 grabar.py || echo "fallo al leer Renfe; se reintenta en la siguiente vuelta"
+            if git add datos && git commit -qm "datos $(date -u +%FT%H:%M)"; then
+              for i in 1 2 3; do git pull -q --rebase && git push -q && break; sleep 5; done
+            fi
+            sleep $(( 300 - $(date +%s) % 300 ))
+          done
+      - name: relevo
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run grabar-continuo.yml -R "${{ github.repository }}"
