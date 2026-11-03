@@ -1,0 +1,18 @@
+name: grabar trenes
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # cada 5 minutos (GitHub a veces se retrasa unos minutos)
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: grabar
+jobs:
+  grabar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir -p datos && python3 grabar.py
+      - run: |
+          git config user.name "grabador" && git config user.email "grabador@users.noreply.github.com"
+          git add datos && git commit -qm "datos $(date -u +%FT%H:%M)" && git push -q || echo "sin cambios"
