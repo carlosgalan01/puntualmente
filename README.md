@@ -10,19 +10,19 @@ Prototipo del Trabajo Fin de Máster (Máster en Inteligencia Artificial, Instit
 - **Previsión IA.** Una red neuronal pequeña estima cuánto retraso llevará cada tren unos minutos después. Se compara siempre con la apuesta más simple, «seguirá igual».
 - **Posibles incidencias.** Un detector de anomalías marca las líneas que van mucho peor que el resto de la red y dice si Renfe ya ha publicado un aviso.
 - **Familias de líneas.** Un agrupamiento con k-medias reúne las líneas de Cercanías según cómo se comportan.
-- **Moviola.** Reproduce acelerado lo grabado durante el día.
+- **Hoy a cámara rápida.** Reproduce acelerado lo grabado durante el día.
 
 ## Cómo está montado
 
 | Pieza | Dónde | Qué hace |
 |---|---|---|
-| Caja negra | `grabar.py` + `.github/workflows/grabar.yml` | Cada 5 minutos guarda una foto de toda la red en `datos/AAAA-MM-DD.csv` y los avisos en `datos/avisos.json`. |
+| Caja negra | `grabar.py` + `.github/workflows/grabar.yml` | Cada 5 minutos guarda una foto de toda la red en `datos/AAAA-MM-DD.csv` y los avisos en `datos/avisos.json`, en la rama [`datos`](../../tree/datos/datos) (no en `main`, para que cada foto no cuente como una versión nueva de la web). |
 | Entreno nocturno | `modelo/entrenar.py`, `modelo/agrupar.py` + `.github/workflows/entrenar.yml` | Cada noche vuelve a entrenar la red y las familias con todo lo grabado y publica los resultados en `web/base/`. |
-| Web | `web/` (Vercel) | `api/trenes.js` junta las fuentes en directo, `api/historia.js` sirve lo grabado para la moviola, e `index.html` es la página. La red neuronal se ejecuta en el navegador. |
+| Web | `web/` (Vercel) | `api/trenes.js` junta las fuentes en directo, `api/historia.js` sirve lo grabado para «Hoy a cámara rápida», e `index.html` es la página. La red neuronal se ejecuta en el navegador. |
 
 ## Los datos
 
-Fuentes abiertas de Renfe: posiciones y retrasos de Cercanías (formato GTFS-Realtime, `gtfsrt.renfe.com`), el visor de larga y media distancia, y los horarios programados (GTFS). Cada fila de `datos/*.csv` es un tren en una foto:
+Fuentes abiertas de Renfe: posiciones y retrasos de Cercanías (formato GTFS-Realtime, `gtfsrt.renfe.com`), el visor de larga y media distancia, y los horarios programados (GTFS). Cada fila de `datos/*.csv` (rama `datos`) es un tren en una foto:
 
 `foto_utc, tipo, tren, lat, lon, retraso_min, siguiente_parada, extra, hora_dato`
 

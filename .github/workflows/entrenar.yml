@@ -12,12 +12,16 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4   # lo grabado vive en la rama «datos»
+        with:
+          ref: datos
+          path: almacen
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -q scikit-learn numpy
-      - run: python modelo/entrenar.py --csv datos/*.csv --horizonte 30 --tendencia 5 --salida web/base/modelo.json
-      - run: cd modelo && python agrupar.py --csv ../datos/*.csv --salida ../web/base/familias.json
+      - run: python modelo/entrenar.py --csv almacen/datos/*.csv --horizonte 30 --tendencia 5 --salida web/base/modelo.json
+      - run: cd modelo && python agrupar.py --csv ../almacen/datos/*.csv --salida ../web/base/familias.json
       - run: |
           git config user.name "entrenador" && git config user.email "entrenador@users.noreply.github.com"
           git add web/base/modelo.json web/base/familias.json && git commit -qm "modelo reentrenado $(date -u +%F)" || exit 0

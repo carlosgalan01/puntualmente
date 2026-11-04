@@ -36,7 +36,7 @@
         <span><i style="background:var(--puntual)"></i>En hora</span><span><i style="background:var(--leve)"></i>3–5 min</span><span><i style="background:var(--ambar)"></i>6–15 min</span><span><i style="background:var(--rojo)"></i>Más de 15</span><span>◯ larga y media distancia</span>
       </div>
       <div class="mando">
-        <div class="modos" role="group" aria-label="Qué ver"><button id="mVivo" aria-pressed="true">En directo</button><button id="mPrev" aria-pressed="false">Previsión IA</button><button id="mMoviola" aria-pressed="false">Moviola de hoy</button></div>
+        <div class="modos" role="group" aria-label="Qué ver"><button id="mVivo" aria-pressed="true">En directo</button><button id="mPrev" aria-pressed="false">Previsión IA</button><button id="mMoviola" aria-pressed="false">Hoy a cámara rápida</button></div>
         <span class="estado-vivo" id="vivo">Pidiendo los datos a Renfe…</span>
         <div class="moviola" id="moviola" hidden><button class="play" id="play" aria-label="Pausar">❚❚</button><span class="reloj" id="reloj">--:--</span><input type="range" id="linea" min="0" max="1000" value="0" aria-label="Momento del día"><span class="vel" id="vel"></span></div>
       </div>
@@ -121,7 +121,7 @@
         <path d="M460,240 L528,240" class="flujo" marker-end="url(#flecha)"/>
         <path d="M700,240 C720,240 720,190 738,190" class="flujo" marker-end="url(#flecha)"/>
         <path d="M460,222 C560,160 640,160 738,160" class="flujo fino" marker-end="url(#flecha)"/>
-        <text x="600" y="152" class="etq">la moviola lee lo grabado</text>
+        <text x="600" y="152" class="etq">la cámara rápida lee lo grabado</text>
       </svg>
     </div>
   </section>
@@ -132,7 +132,7 @@
     <div class="pasos">
       <div class="paso"><span class="estado on">● Versión 0 en marcha</span><h3>Predecir el retraso a la llegada</h3><p>Un modelo aprende cómo se comporta cada línea según la hora, el día y el retraso que ya lleva el tren, y estima con cuánto llegará a destino.</p></div>
       <div class="paso"><span class="estado on">● Versión 0 en marcha</span><h3>Avisar antes que el aviso oficial</h3><p>Ya marca en rojo las líneas que van mucho peor que el resto de la red en este momento, y dice si Renfe ya ha avisado o no. Con semanas grabadas, comparará cada línea con lo que es normal para ella a esa hora.</p></div>
-      <div class="paso"><span class="estado ya">Ya en la web</span><h3>La moviola del día</h3><p>Pasar un día entero en un minuto para ver cómo un retraso se contagia de un tren a los que vienen detrás.</p></div>
+      <div class="paso"><span class="estado ya">Ya en la web</span><h3>Hoy a cámara rápida</h3><p>Pasar un día entero en un minuto para ver cómo un retraso se contagia de un tren a los que vienen detrás.</p></div>
     </div>
   </section>
 
@@ -204,7 +204,7 @@ async function pedir() {
   pintarEstado(); panel(); apuntarSalud();
 }
 
-// ---- moviola: lo grabado hoy por la caja negra, reproducido acelerado ----
+// ---- «Hoy a cámara rápida» (en el código, «moviola»): lo grabado hoy por la caja negra, reproducido acelerado ----
 let modo = 'vivo', hist = null, tt = 0, playH = true, velH = 600, ultimaLista = [];
 function estadoH(h, t) {
   const T = hist.t, n = T.length; if (!n) return null;
@@ -252,7 +252,7 @@ function cambiarModo(m) {
   document.getElementById('moviola').hidden = m !== 'moviola';
   document.getElementById('leyendaPrev').hidden = m !== 'prevision';
   foco = null; siguiendo = false; seguido();
-  document.getElementById('selloModo').innerHTML = m === 'moviola' ? 'Moviola de hoy' : m === 'prevision' ? '<span class="rec"></span>Previsión de la IA' : '<span class="rec"></span>En directo';
+  document.getElementById('selloModo').innerHTML = m === 'moviola' ? 'Hoy a cámara rápida' : m === 'prevision' ? '<span class="rec"></span>Previsión de la IA' : '<span class="rec"></span>En directo';
   if (m === 'moviola') { document.getElementById('tramo').textContent = 'Lo grabado hoy'; abrirMoviola(); } else { pintarEstado(); }
   panel();
 }
@@ -618,7 +618,7 @@ await pedir();
 // enlace directo a un panel: ?estacion=Valladolid
 const pedida = new URLSearchParams(location.search).get('estacion');
 if (pedida) { const q = norm(pedida); const est = trenesAhora().flatMap(e => [e.s, e.dst]).find(x => x && norm(x).includes(q)); if (est) abrirPanel(est); }
-const modoDeEnlace = () => ({ '#repeticion': 'moviola', '#prevision': 'prevision' })[location.hash] ?? 'vivo';
+const modoDeEnlace = () => ({ '#camara-rapida': 'moviola', '#repeticion': 'moviola', '#prevision': 'prevision' })[location.hash] ?? 'vivo';
 if (modoDeEnlace() !== 'vivo') cambiarModo(modoDeEnlace());
 addEventListener('hashchange', () => cambiarModo(modoDeEnlace()));
 setInterval(pedir, CADA);

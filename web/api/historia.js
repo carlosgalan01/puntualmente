@@ -1,8 +1,8 @@
-// La moviola: lee lo que la caja negra ha grabado un día y lo devuelve tren a tren, foto a foto.
+// «Hoy a cámara rápida»: lee lo que la caja negra ha grabado un día y lo devuelve tren a tren, foto a foto.
 const { nombres, prod } = require("./_aux.json");
 const { NUCLEOS } = require("./_nucleos.js");
 
-const RAW = "https://raw.githubusercontent.com/carlosgalan01/puntualmente/main/datos/";
+const RAW = "https://raw.githubusercontent.com/carlosgalan01/puntualmente/datos/datos/";
 const r3 = (v) => Math.round(v * 1e3) / 1e3;
 
 module.exports = async (req, res) => {

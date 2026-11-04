@@ -1,4 +1,6 @@
 name: grabar trenes
+# De reserva: sólo graba si el grabador continuo no ha dejado una foto en los últimos 4 minutos.
+# Los datos van a la rama «datos», no a main (ver grabar-continuo.yml).
 on:
   schedule:
     - cron: "*/5 * * * *"   # cada 5 minutos (GitHub a veces se retrasa unos minutos)
@@ -12,8 +14,14 @@ jobs:
     timeout-minutes: 4
     steps:
       - uses: actions/checkout@v4
-      - run: mkdir -p datos && python3 grabar.py --si-hace-falta
-      - run: |
+      - uses: actions/checkout@v4
+        with:
+          ref: datos
+          path: almacen
+      - working-directory: almacen
+        run: mkdir -p datos && python3 ../grabar.py --si-hace-falta
+      - working-directory: almacen
+        run: |
           git config user.name "grabador" && git config user.email "grabador@users.noreply.github.com"
           git add datos && git commit -qm "datos $(date -u +%FT%H:%M)" || exit 0
           # si a la vez se ha subido otra cosa, se recoge y se reintenta: así no se pierde ninguna foto
