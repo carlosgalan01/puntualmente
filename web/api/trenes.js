@@ -25,6 +25,8 @@ async function leer(nombre, url) {
 }
 
 const r4 = (v) => Math.round(v * 1e4) / 1e4;
+// Renfe añade «-PLATF.(n)» al nombre de un tren mientras está en un andén; sin quitarlo, el mapa lo tomaría por otro tren
+const sinAnden = (s) => s.replace(/-PLATF\.\(.*\)$/, "");
 const limpia = (s) => s.replace(/^(#\S+\s*)+/, "").replace(/\s+/g, " ").trim();
 
 module.exports = async (req, res) => {
@@ -39,7 +41,7 @@ module.exports = async (req, res) => {
     for (const e of pos.j.entity) {
       const v = e.vehicle;
       if (!v.position) continue;
-      const etiqueta = v.vehicle?.label ?? v.trip.tripId;
+      const etiqueta = sinAnden(v.vehicle?.label ?? v.trip.tripId);
       const [linea, num] = etiqueta.split("-");
       trenes.push({ id: "c" + etiqueta, k: "c", n: linea, num: num ?? "", z: NUCLEOS[v.trip.tripId.slice(0, 2)] ?? "",
         s: nombres[v.stopId] ?? "", lon: r4(v.position.longitude), lat: r4(v.position.latitude),

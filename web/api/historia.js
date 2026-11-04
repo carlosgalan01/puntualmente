@@ -12,7 +12,9 @@ module.exports = async (req, res) => {
   const filas = (await r.text()).trim().split("\n").slice(1);
   const fotos = new Map(), trenes = new Map();
   for (const f of filas) {
-    const [foto, tipo, tren, lat, lon, ret, sig, extra] = f.split(",");
+    const [foto, tipo, tren0, lat, lon, ret, sig, extra] = f.split(",");
+    // el mismo tren lleva «-PLATF.(n)» mientras está en un andén: se quita para no partirlo en dos
+    const tren = tren0.replace(/-PLATF\.\(.*\)$/, "");
     if (!fotos.has(foto)) fotos.set(foto, fotos.size);
     const i = fotos.get(foto), k = tipo === "larga" ? "l" : "c", id = k + tren;
     let t = trenes.get(id);

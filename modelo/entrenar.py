@@ -7,7 +7,7 @@ con la estimación ingenua de «seguirá igual». Exporta los pesos a JSON para 
 Uso:  python entrenar.py --csv datos/*.csv --horizonte 30 --tendencia 5 --salida web/base/modelo.json
       python entrenar.py --captura carpeta_con_cp_tu_ld --horizonte 5 --tendencia 2 --salida ...
 """
-import argparse, csv, datetime, glob, json, math, os, random
+import argparse, csv, datetime, glob, json, math, os, random, re
 from collections import defaultdict
 
 import numpy as np
@@ -22,6 +22,10 @@ NUCLEOS = {"10": "Madrid", "20": "Asturias", "30": "Sevilla", "31": "Cádiz", "3
            "62": "Cantabria", "70": "Zaragoza"}
 
 
+# Renfe añade «-PLATF.(n)» al nombre de un tren mientras está en un andén: es el mismo tren
+sin_anden = lambda s: re.sub(r"-PLATF\.\(.*\)$", "", s)
+
+
 def fotos_de_csv(rutas, prod):
     fotos = defaultdict(dict)
     for ruta in rutas:
@@ -31,7 +35,7 @@ def fotos_de_csv(rutas, prod):
             extra = f.get("extra", "")
             zona = NUCLEOS.get(extra.split("|")[1][:2], "") if k == "c" and "|" in extra else ""
             producto = prod.get(str(int(f["tren"]))) if k == "l" and f["tren"].isdigit() else ""
-            fotos[t][k + f["tren"]] = (k, zona, producto, float(f["lat"]), float(f["lon"]), float(f["retraso_min"] or 0))
+            fotos[t][k + sin_anden(f["tren"])] = (k, zona, producto, float(f["lat"]), float(f["lon"]), float(f["retraso_min"] or 0))
     return fotos
 
 
@@ -49,7 +53,7 @@ def fotos_de_captura(carpeta, prod):
             v = e["vehicle"]
             if "position" not in v: continue
             tid = v["trip"]["tripId"]
-            foto["c" + v.get("vehicle", {}).get("label", tid)] = ("c", NUCLEOS.get(tid[:2], ""), "", v["position"]["latitude"], v["position"]["longitude"], ret.get(tid, 0) / 60)
+            foto["c" + sin_anden(v.get("vehicle", {}).get("label", tid))] = ("c", NUCLEOS.get(tid[:2], ""), "", v["position"]["latitude"], v["position"]["longitude"], ret.get(tid, 0) / 60)
         for x in ld["trenes"]:
             foto["l" + x["codComercial"]] = ("l", "", prod.get(str(int(x["codComercial"])), ""), x["latitud"], x["longitud"], float(x.get("ultRetraso") or 0))
         fotos[t] = foto

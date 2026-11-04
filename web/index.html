@@ -168,6 +168,7 @@ const avance = (e, ahora) => sinMovimiento ? 1 : Math.min(1, (ahora - e.t0) / CA
 const pos = (e, ahora) => { const u = avance(e, ahora); return [e.de[0] + (e.a[0] - e.de[0]) * u, e.de[1] + (e.a[1] - e.de[1]) * u]; };
 const alfa = (e, ahora) => e.al0 + (e.al1 - e.al0) * Math.min(1, avance(e, ahora) * 3);
 let ultimaFoto = 0, fallos = 0, avisos = [];
+const SIN_SENAL_MAX = 180; // segundos que un tren sin noticias sigue en el mapa
 function aplicar(j) {
   const ahora = performance.now(), vistos = new Set();
   // si una fuente no ha respondido, sus trenes se quedan donde estaban en vez de desaparecer
@@ -177,16 +178,19 @@ function aplicar(j) {
     vistos.add(t.id);
     const nuevo = [X(t.lon), Y(t.lat)];
     let e = trenes.get(t.id);
-    if (!e) { trenes.set(t.id, { ...t, de: nuevo, a: nuevo, t0: ahora, al0: ultimaFoto ? 0 : 1, al1: 1, rastro: [], hist: [[j.t, t.d, t.lat, t.lon]] }); trenes.get(t.id).pred = predecir(trenes.get(t.id)); continue; }
+    if (!e) { trenes.set(t.id, { ...t, de: nuevo, a: nuevo, t0: ahora, al0: ultimaFoto ? 0 : 1, al1: 1, visto: j.t, rastro: [], hist: [[j.t, t.d, t.lat, t.lon]] }); trenes.get(t.id).pred = predecir(trenes.get(t.id)); continue; }
     const p = pos(e, ahora), salto = Math.hypot(nuevo[0] - p[0], nuevo[1] - p[1]) > .4;
     if (!salto) { e.rastro.push(p); if (e.rastro.length > 8) e.rastro.shift(); } else e.rastro = [];
-    Object.assign(e, t, { de: salto ? nuevo : p, a: nuevo, t0: ahora, al0: alfa(e, ahora), al1: 1, fuera: false });
+    Object.assign(e, t, { de: salto ? nuevo : p, a: nuevo, t0: ahora, al0: alfa(e, ahora), al1: 1, fuera: false, visto: j.t, sinSenal: false });
     e.hist.push([j.t, t.d, t.lat, t.lon]); if (e.hist.length > 60) e.hist.shift(); e.pred = predecir(e);
   }
   for (const [id, e] of trenes) {
     if (vistos.has(id) || !llego[e.k]) continue;
     if (e.fuera) { trenes.delete(id); continue; }
     const p = pos(e, ahora);
+    // Renfe a veces deja de mandar la posición de un tren uno o dos minutos (túneles, cobertura):
+    // se queda quieto y más apagado donde se vio por última vez; si en 3 minutos no vuelve, se quita
+    if (j.t - (e.visto ?? j.t) < SIN_SENAL_MAX) { Object.assign(e, { de: p, a: p, t0: ahora, al0: alfa(e, ahora), al1: .4, sinSenal: true }); continue; }
     Object.assign(e, { de: p, a: p, t0: ahora, al0: alfa(e, ahora), al1: 0, fuera: true });
   }
   ultimaFoto = j.t;
