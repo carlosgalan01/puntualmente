@@ -26,6 +26,11 @@ NUCLEOS = {"10": "Madrid", "20": "Asturias", "30": "Sevilla", "31": "Cádiz", "3
 sin_anden = lambda s: re.sub(r"-PLATF\.\(.*\)$", "", s)
 
 
+def sin_salto(d):
+    """Renfe da el retraso de los trenes que cruzan la medianoche con un día de más o de menos (-1436 = 4 min)."""
+    return d + 1440 if d < -720 else d - 1440 if d > 720 else d
+
+
 def fotos_de_csv(rutas, prod):
     fotos = defaultdict(dict)
     for ruta in rutas:
@@ -35,7 +40,7 @@ def fotos_de_csv(rutas, prod):
             extra = f.get("extra", "")
             zona = NUCLEOS.get(extra.split("|")[1][:2], "") if k == "c" and "|" in extra else ""
             producto = prod.get(str(int(f["tren"]))) if k == "l" and f["tren"].isdigit() else ""
-            fotos[t][k + sin_anden(f["tren"])] = (k, zona, producto, float(f["lat"]), float(f["lon"]), float(f["retraso_min"] or 0))
+            fotos[t][k + sin_anden(f["tren"])] = (k, zona, producto, float(f["lat"]), float(f["lon"]), sin_salto(float(f["retraso_min"] or 0)))
     return fotos
 
 
@@ -53,7 +58,7 @@ def fotos_de_captura(carpeta, prod):
             v = e["vehicle"]
             if "position" not in v: continue
             tid = v["trip"]["tripId"]
-            foto["c" + sin_anden(v.get("vehicle", {}).get("label", tid))] = ("c", NUCLEOS.get(tid[:2], ""), "", v["position"]["latitude"], v["position"]["longitude"], ret.get(tid, 0) / 60)
+            foto["c" + sin_anden(v.get("vehicle", {}).get("label", tid))] = ("c", NUCLEOS.get(tid[:2], ""), "", v["position"]["latitude"], v["position"]["longitude"], sin_salto(ret.get(tid, 0) / 60))
         for x in ld["trenes"]:
             foto["l" + x["codComercial"]] = ("l", "", prod.get(str(int(x["codComercial"])), ""), x["latitud"], x["longitud"], float(x.get("ultRetraso") or 0))
         fotos[t] = foto

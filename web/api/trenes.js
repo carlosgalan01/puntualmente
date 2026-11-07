@@ -1,6 +1,8 @@
 // Todos los trenes de Renfe en este momento: junta las fuentes abiertas en una sola lista.
 // El navegador no puede leerlas directamente (Renfe no lo permite desde otra web), por eso pasa por aquí.
 const { nombres, prod } = require("./_aux.json");
+// Renfe da el retraso de los trenes que cruzan la medianoche con un día de más o de menos (-1436 = 4 min)
+const sinSalto = d => d < -720 ? d + 1440 : d > 720 ? d - 1440 : d;
 
 const FUENTES = {
   posiciones: "https://gtfsrt.renfe.com/vehicle_positions.json",
@@ -45,7 +47,7 @@ module.exports = async (req, res) => {
       const [linea, num] = etiqueta.split("-");
       trenes.push({ id: "c" + etiqueta, k: "c", n: linea, num: num ?? "", z: NUCLEOS[v.trip.tripId.slice(0, 2)] ?? "",
         s: nombres[v.stopId] ?? "", lon: r4(v.position.longitude), lat: r4(v.position.latitude),
-        d: Math.round((retraso[v.trip.tripId] ?? 0) / 60) });
+        d: sinSalto(Math.round((retraso[v.trip.tripId] ?? 0) / 60)) });
     }
   }
   for (const t of ld.j?.trenes ?? []) {

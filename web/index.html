@@ -97,7 +97,7 @@
   <section class="familias">
     <div class="texto">
       <h2>Familias de líneas</h2>
-      <p>Un segundo modelo, sin etiquetas: agrupa las líneas de Cercanías según cómo se comportan (retraso medio, cuánto varía, cuántos trenes pasan de 15 minutos y si van a peor) con k-medias. Cada punto es una línea; arriba a la derecha, las que peor lo pasan.</p>
+      <p>Un segundo modelo, sin etiquetas: agrupa las líneas de Cercanías según cómo se comportan (retraso medio, cuánto varía, cuántos trenes pasan de 15 minutos y si van a peor) con k-medias. Cada punto es una línea; arriba a la derecha, las que peor lo pasan. Pasa el ratón o pulsa un punto para ver qué línea es.</p>
       <ul class="leyenda-fam" id="famLeyenda"></ul>
       <p class="version" id="famVersion"></p>
     </div>
@@ -415,9 +415,13 @@ fetch('/base/familias.json').then(r => r.json()).then(F => {
   for (let v = 0; v <= xmax; v += xmax / 5) svg += `<text x="${x(v)}" y="${H - m.b + 18}" text-anchor="middle" class="eje">${Math.round(v)}′</text>`;
   svg += `<text x="${(W + m.l) / 2}" y="${H - 4}" text-anchor="middle" class="eje-t">retraso medio de la línea (minutos)</text>`;
   svg += `<text transform="translate(12 ${(H - m.b) / 2}) rotate(-90)" text-anchor="middle" class="eje-t">trenes con más de 15 min</text>`;
-  for (const l of F.lineas) svg += `<circle cx="${x(l.retraso_medio)}" cy="${y(l.graves_pct)}" r="6" fill="${cols[l.familia]}" fill-opacity=".85" stroke="${C.panel}" stroke-width="1.5"><title>${escapa(l.linea)} · ${l.retraso_medio} min de media · ${l.graves_pct} % con más de 15 min</title></circle>`;
-  for (const l of F.lineas.filter(l => l.familia >= 2)) svg += `<text x="${x(l.retraso_medio) - 9}" y="${y(l.graves_pct) + 4}" text-anchor="end" class="etq">${escapa(l.linea)}</text>`;
+  for (const l of F.lineas) { const cx = x(l.retraso_medio), cy = y(l.graves_pct), izq = cx > W / 2;
+    svg += `<g class="fam-p" tabindex="0"><circle cx="${cx}" cy="${cy}" r="6" fill="${cols[l.familia]}" fill-opacity=".85" stroke="${C.panel}" stroke-width="1.5"/><circle cx="${cx}" cy="${cy}" r="11" fill="transparent"/>`
+      + `<text x="${cx + (izq ? -12 : 12)}" y="${cy - 10}" text-anchor="${izq ? 'end' : 'start'}" class="etq">${escapa(l.linea)} · ${String(l.retraso_medio).replace('.', ',')}′ · ${String(l.graves_pct).replace('.', ',')} %</text></g>`; }
   document.getElementById('famGrafica').innerHTML = svg + '</svg>';
+  const pts = document.querySelectorAll('#famGrafica .fam-p');
+  pts.forEach(g => g.addEventListener('click', ev => { ev.stopPropagation(); const ya = g.classList.contains('activo'); pts.forEach(o => o.classList.remove('activo')); if (!ya) { g.classList.add('activo'); g.parentNode.appendChild(g); } }));
+  document.addEventListener('click', () => pts.forEach(o => o.classList.remove('activo')));
 }).catch(() => { document.querySelector('.familias')?.remove(); });
 
 const colorDe = e => color(modo === 'prevision' && e.pred != null ? e.pred : e.d);
