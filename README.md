@@ -34,5 +34,3 @@ En Cercanías, `extra` lleva el estado del tren y, desde el 3/11/2026 a las 21:0
 - El visor de larga distancia no está documentado como servicio público y puede cambiar sin aviso.
 - La primera versión de los modelos se entrenó con 10 minutos de datos; sus números están en la web, sin maquillar.
 - Prototipo académico. No es una herramienta de Renfe ni está relacionado con la compañía.
-
-Hecho con ayuda de Claude (Anthropic) para el código y el análisis.
